@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use super::{BUSY, first_line};
 
 impl Tui {
-    pub(super) fn idle_agent(&mut self) -> bool {
+    pub(crate) fn idle_agent(&mut self) -> bool {
         if self.agent.is_none() {
             self.say(BUSY);
             return false;

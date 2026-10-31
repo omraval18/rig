@@ -69,7 +69,7 @@ rig -c                                # continue the latest session in this dire
 | `Shift+Tab` / `Ctrl+P` | cycle permissions / model picker |
 | `Alt+Enter`, `Ctrl+J`, trailing `\` | newline |
 
-Commands: `/new` (`/clear`), `/resume`, `/fork`, `/rename`, `/compact`, `/model`, `/effort`, `/permissions`, `/allowlist`, `/undo`, `/skills [list|show|create|path]`, `/copy`, `/reasoning`, `/status`, `/summary`, `/settings`, `/provider`, `/profile`, `/login`, `/logout`, `/stats`, `/version`, `/help`, `/quit`. `/help` groups them.
+Commands: `/new` (`/clear`), `/resume`, `/fork`, `/rename`, `/compact`, `/model`, `/effort`, `/permissions`, `/allowlist`, `/undo`, `/skills [list|show|create|path]`, `/copy`, `/reasoning`, `/status`, `/summary`, `/loop`, `/settings`, `/provider`, `/profile`, `/login`, `/logout`, `/stats`, `/version`, `/help`, `/quit`. `/help` groups them.
 
 ### Full-window UI
 
@@ -78,6 +78,10 @@ rig takes over the whole terminal window (the alternate screen, like vim): the c
 - **Scroll:** mouse wheel, PageUp / PageDown; End jumps back to the latest. Hold Shift (Option on macOS) to select text with the mouse, or turn mouse capture off in `/settings`. `/copy` copies the last reply.
 - **`/new`, `/resume`, `/fork`** clear the window down to the new session's own messages.
 - **Per-session settings:** every session records the model, effort and permissions it uses. `rig -c`, `rig --resume <id>` and `/resume` bring that session's own setup back, whatever other sessions used since (flags still win). New chats use what you used last.
+
+### Loops
+
+`/loop <objective>` (or `/goal`) works toward one objective across several turns. After each turn, rig starts another round unless the model has reported the goal complete (through `update_goal`) or blocked (after asking you with `ask_user`). It stops after 10 rounds, when you press Ctrl-C, or when you interrupt a round. The footer shows `goal N/10` while a loop runs; `/loop` shows the goal and `/loop stop` drops it.
 
 ### Questions
 

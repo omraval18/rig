@@ -5,6 +5,7 @@ mod context_tools;
 mod exec;
 mod fetch;
 mod glob;
+mod goal;
 mod grep;
 pub mod index;
 mod ls;
@@ -29,6 +30,7 @@ pub fn builtin() -> Registry {
         Box::new(context_tools::UseSkill),
         Box::new(context_tools::Recall),
         Box::new(ask::AskUser),
+        Box::new(goal::UpdateGoal),
     ];
     Registry::new(tools)
 }
