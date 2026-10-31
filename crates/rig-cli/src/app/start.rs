@@ -84,7 +84,7 @@ impl App {
         policy.set_allowlist(self.load_allowlist());
         let mut agent = Agent::new(
             provider,
-            rig_tools::builtin(),
+            rig_tools::builtin().with(rig_mcp::tools(self.mcp.clone())),
             policy,
             SYSTEM_PROMPT.to_string(),
             ctx,

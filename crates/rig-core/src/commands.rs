@@ -26,6 +26,7 @@ pub enum Cmd {
     Compact,
     Summary,
     Loop,
+    Mcp,
     Reasoning,
     Settings,
     Version,
@@ -187,6 +188,14 @@ pub static COMMANDS: &[Spec] = &[
             true,
         )
     },
+    spec(
+        Cmd::Mcp,
+        "mcp",
+        "/mcp",
+        "show the MCP servers and whether they are running",
+        Category::Extensions,
+        false,
+    ),
     spec(
         Cmd::Summary,
         "summary",

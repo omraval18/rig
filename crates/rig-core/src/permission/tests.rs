@@ -87,3 +87,54 @@ fn level_changes_are_visible_through_clones() {
     assert_eq!(Autonomy::parse("full-access"), Some(Autonomy::High));
     assert_eq!(Autonomy::parse("auto"), Some(Autonomy::Low));
 }
+
+fn mcp(read_only: bool) -> Access {
+    Access::Mcp {
+        server: "notes".into(),
+        tool: "write_note".into(),
+        read_only,
+    }
+}
+
+#[test]
+fn outside_tools_follow_the_autonomy_ladder_and_read_only_hints() {
+    // A server's read-only hint lets the call through at every level.
+    for a in [Autonomy::ReadOnly, Autonomy::Ask, Autonomy::Low] {
+        assert_eq!(Policy::new(a).decide(&mcp(true)), Decision::Allow, "{a:?}");
+    }
+    // Anything else changes something outside the workspace.
+    assert!(matches!(
+        Policy::new(Autonomy::ReadOnly).decide(&mcp(false)),
+        Decision::Deny(_)
+    ));
+    assert!(matches!(
+        Policy::new(Autonomy::Ask).decide(&mcp(false)),
+        Decision::Ask(_)
+    ));
+    assert!(matches!(
+        Policy::new(Autonomy::Low).decide(&mcp(false)),
+        Decision::Ask(_)
+    ));
+    assert!(matches!(
+        Policy::new(Autonomy::Medium).decide(&mcp(false)),
+        Decision::Ask(_)
+    ));
+    assert_eq!(
+        Policy::new(Autonomy::High).decide(&mcp(false)),
+        Decision::Allow
+    );
+}
+
+#[test]
+fn an_always_answer_is_remembered_per_server_tool() {
+    let p = Policy::new(Autonomy::Low);
+    assert!(matches!(p.decide(&mcp(false)), Decision::Ask(_)));
+    p.remember(&mcp(false));
+    assert_eq!(p.decide(&mcp(false)), Decision::Allow);
+    let other = Access::Mcp {
+        server: "notes".into(),
+        tool: "delete_note".into(),
+        read_only: false,
+    };
+    assert!(matches!(p.decide(&other), Decision::Ask(_)));
+}

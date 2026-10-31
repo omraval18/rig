@@ -54,6 +54,7 @@ impl Tui {
             Cmd::Compact => self.cmd_compact(),
             Cmd::Summary => self.cmd_summary(),
             Cmd::Loop => self.cmd_loop(arg),
+            Cmd::Mcp => self.cmd_mcp(),
             Cmd::Undo => self.cmd_undo(),
             Cmd::Paste => self.paste_clipboard_image(),
             Cmd::Copy => self.cmd_copy(),

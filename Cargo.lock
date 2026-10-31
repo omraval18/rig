@@ -704,6 +704,7 @@ dependencies = [
  "crossterm",
  "minisign-verify",
  "rig-core",
+ "rig-mcp",
  "rig-provider",
  "rig-tools",
  "serde",
@@ -718,6 +719,15 @@ dependencies = [
 name = "rig-core"
 version = "0.2.0"
 dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "rig-mcp"
+version = "0.2.0"
+dependencies = [
+ "rig-core",
  "serde",
  "serde_json",
 ]

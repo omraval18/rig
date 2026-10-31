@@ -41,6 +41,13 @@ pub enum Access {
         question: String,
         options: Vec<String>,
     },
+    /// A tool on an external MCP server. `read_only` is the server's own annotation: it says the
+    /// call changes nothing, and is trusted only as far as the server is.
+    Mcp {
+        server: String,
+        tool: String,
+        read_only: bool,
+    },
 }
 
 impl Access {
@@ -146,6 +153,12 @@ impl Registry {
 
     pub fn specs(&self) -> Vec<ToolSpec> {
         self.tools.iter().map(|t| t.spec()).collect()
+    }
+
+    /// Adds tools after the built-in ones (for example MCP tools).
+    pub fn with(mut self, extra: Vec<Box<dyn Tool>>) -> Self {
+        self.tools.extend(extra);
+        self
     }
 }
 

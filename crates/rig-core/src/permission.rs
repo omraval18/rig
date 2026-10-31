@@ -150,6 +150,19 @@ impl Policy {
         let autonomy = self.autonomy();
         match access {
             Access::Read | Access::Network | Access::Ask { .. } => Decision::Allow,
+            Access::Mcp {
+                read_only: true, ..
+            } => Decision::Allow,
+            Access::Mcp { .. } => match autonomy {
+                Autonomy::ReadOnly => {
+                    Decision::Deny("outside tools are off in read-only mode".into())
+                }
+                _ if self.allowed(access) => Decision::Allow,
+                Autonomy::Ask | Autonomy::Low | Autonomy::Medium => {
+                    Decision::Ask("this tool changes something outside the workspace".into())
+                }
+                Autonomy::High => Decision::Allow,
+            },
             Access::Write => match autonomy {
                 Autonomy::ReadOnly => {
                     Decision::Deny("editing files is disabled in read-only mode".into())
@@ -196,6 +209,7 @@ pub fn rule_for(access: &Access) -> Option<String> {
 fn allow_key(access: &Access) -> Option<String> {
     match access {
         Access::Write => Some("edit".into()),
+        Access::Mcp { server, tool, .. } => Some(format!("mcp {server}.{tool}")),
         Access::Exec { command, .. } => {
             if command.contains(['&', ';', '|', '`', '>', '<', '\n']) || command.contains("$(") {
                 return None;
