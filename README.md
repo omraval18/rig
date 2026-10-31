@@ -6,6 +6,9 @@
 - **Safe by default.** Four autonomy levels, from *ask before every edit* to *full access*. Commands are risk-gated: risky ones such as pushes and deletions need approval unless your level allows them, and every approval is shown in the UI.
 - **Any model you have.** Your ChatGPT subscription, Anthropic, OpenAI, xAI, OpenRouter, Ollama, or any OpenAI-compatible server.
 - **Profiles.** Keep a work and a personal account, or two API keys, side by side. Each profile has its own logins, keys and settings.
+- **Full access on demand.** `rigd` is the same binary starting at full access, for trusted checkouts and containers.
+- **Keys from inside the app.** Choose a provider with no key and a masked box asks for it. Pick **+ New profile…** to create another profile.
+- **Small on disk.** A ~3 MB binary. Sessions appear only once you send a message, and settings are not rewritten when unchanged.
 - **Local and inspectable.** Sessions are plain JSON Lines files on your disk. Network use is the model provider you chose, sign-in, and any web pages the agent fetches.
 
 | | rig 0.1.0 |
