@@ -115,9 +115,11 @@ impl Provider for Anthropic {
             match ev["type"].as_str().unwrap_or("") {
                 "message_start" => {
                     let u = &ev["message"]["usage"];
-                    usage.input = u["input_tokens"].as_u64().unwrap_or(0)
-                        + u["cache_read_input_tokens"].as_u64().unwrap_or(0);
+                    // Anthropic reports uncached, cache-read and cache-write prompt tokens separately.
                     usage.cached = u["cache_read_input_tokens"].as_u64().unwrap_or(0);
+                    usage.cache_write = u["cache_creation_input_tokens"].as_u64().unwrap_or(0);
+                    usage.input =
+                        u["input_tokens"].as_u64().unwrap_or(0) + usage.cached + usage.cache_write;
                 }
                 "content_block_start" => {
                     let cb = &ev["content_block"];

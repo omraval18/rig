@@ -13,6 +13,7 @@ pub mod fuzzy;
 pub mod image;
 pub mod message;
 pub mod permission;
+pub mod pricing;
 pub mod prompt;
 pub mod provider;
 pub mod session;

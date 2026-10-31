@@ -38,6 +38,7 @@ impl Provider for Script {
                 input: 100,
                 output: 10,
                 cached: 0,
+                cache_write: 0,
             },
             stop,
         })

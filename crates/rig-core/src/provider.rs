@@ -60,9 +60,13 @@ pub enum StreamEvent<'a> {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Usage {
+    /// All prompt tokens, including the cached and the written ones below.
     pub input: u64,
     pub output: u64,
+    /// Prompt tokens read from the provider's prompt cache.
     pub cached: u64,
+    /// Prompt tokens written to the prompt cache (billed at a higher rate on some providers).
+    pub cache_write: u64,
 }
 
 impl std::ops::AddAssign for Usage {
@@ -70,6 +74,7 @@ impl std::ops::AddAssign for Usage {
         self.input += other.input;
         self.output += other.output;
         self.cached += other.cached;
+        self.cache_write += other.cache_write;
     }
 }
 

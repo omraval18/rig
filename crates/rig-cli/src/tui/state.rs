@@ -53,6 +53,12 @@ pub struct PendingApproval {
 pub struct Stats {
     pub turns: u64,
     pub total: Usage,
+    /// Estimated cost in USD, from list prices, of the turns we had a price for.
+    pub cost: f64,
+    /// Turns on a model with no list price here, so they are not in `cost`.
+    pub unpriced_turns: u64,
+    /// Turns on a ChatGPT plan: included in the subscription, not billed per token.
+    pub plan_turns: u64,
 }
 
 /// What the last printed transcript block was. A blank line separates different kinds, never

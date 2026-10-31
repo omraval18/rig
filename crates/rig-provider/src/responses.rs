@@ -180,6 +180,7 @@ impl Provider for Responses {
                         cached: r["usage"]["input_tokens_details"]["cached_tokens"]
                             .as_u64()
                             .unwrap_or(0),
+                        cache_write: 0,
                     };
                     hit_limit =
                         r["incomplete_details"]["reason"].as_str() == Some("max_output_tokens");
