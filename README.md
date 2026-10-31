@@ -11,9 +11,9 @@
 - **Small on disk.** A ~3 MB binary. Sessions appear only once you send a message, and settings are not rewritten when unchanged.
 - **Local and inspectable.** Sessions are plain JSON Lines files on your disk. Network use is the model provider you chose, sign-in, and any web pages the agent fetches.
 
-| | rig 0.2.0 |
+| | rig 0.3.0 |
 |---|---|
-| Binary | ~3.1 MiB |
+| Binary | ~3.3 MiB |
 | Startup | ~1.5 ms over bare process spawn |
 | Memory | ~12 MB peak for a real request |
 

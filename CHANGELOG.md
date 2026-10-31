@@ -4,6 +4,16 @@ All notable changes to rig are recorded here. The format follows [Keep a Changel
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-31
+
+### Added
+
+- MCP client (stdio servers). Add servers under `[mcp.<name>]` in `config.toml`. The model sees only the server names and two tools, `mcp_search` and `mcp_call`; a server starts the first time the model searches. Read-only tools (the server's `readOnlyHint`) run without asking; other calls follow the approval level. `/mcp` shows the servers and their state.
+- Session cost: `/stats` shows an estimate from list prices, split by cached and written prompt tokens. Prices for 143 models come from models.dev (`scripts/gen_prices.py` regenerates them). ChatGPT plan turns are not priced. Models without a price are counted, not guessed.
+- Built-in providers for DeepSeek, MiniMax, Z.ai, Kimi and Gemini (OpenAI- and Anthropic-compatible APIs), each with a default model. Choosing one without a key asks for the key, then switches to its default model.
+- Add a provider from `/provider` → "+ Add provider…": name, API style, base URL, key (optional for local servers), and model ID. It is saved in your profile (`providers.json`), so you never edit `config.toml` for it.
+- Search models.dev from `/provider` → "Search models.dev…": find any provider and model by name, pick one, and only the key is asked. The base URL, API style, provider name, model and prices come from the catalog. `/refresh-models` downloads the latest list; it is also fetched when a week old. A trimmed copy (about 1.3 MB) is kept in the rig home, not in the binary, so the binary does not grow with the catalog.
+
 ## [0.2.0] - 2026-10-31
 
 ### Added
@@ -11,11 +21,6 @@ All notable changes to rig are recorded here. The format follows [Keep a Changel
 - `ask_user`: the agent can ask a question with up to six options. The panel always ends with "Type something…", so you can give an answer of your own. Number keys pick an option; Esc skips the question; Ctrl-C skips it and stops nothing else.
 - `/loop <objective>` (also `/goal`): keeps working toward an objective across turns. The model reports it complete or blocked through `update_goal`; the loop stops after 10 rounds, on Ctrl-C, or when you interrupt. `/loop` shows the goal, `/loop stop` drops it. Inspired by how Codex handles goals (Apache-2.0).
 - Built-in web search for ChatGPT and OpenAI logins: the provider's own search tool is offered to the model, the same as Codex does. It is off for the other providers; no extra key is needed on the ChatGPT login.
-- MCP client (stdio servers). Add servers under `[mcp.<name>]` in `config.toml`. The model sees only the server names and two tools, `mcp_search` and `mcp_call`; a server starts the first time the model searches. Read-only tools (the server's `readOnlyHint`) run without asking; other calls follow the approval level. `/mcp` shows the servers and their state.
-- Session cost: `/stats` shows an estimate from list prices, split by cached and written prompt tokens. Prices for 143 models come from models.dev (`scripts/gen_prices.py` regenerates them). ChatGPT plan turns are not priced. Models without a price are counted, not guessed.
-- Built-in providers for DeepSeek, MiniMax, Z.ai, Kimi and Gemini (OpenAI- and Anthropic-compatible APIs), each with a default model. Choosing one without a key asks for the key, then switches to its default model.
-- Add a provider from `/provider` → "+ Add provider…": name, API style, base URL, key (optional for local servers), and model ID. It is saved in your profile (`providers.json`), so you never edit `config.toml` for it.
-- Search models.dev from `/provider` → "Search models.dev…": find any provider and model by name, pick one, and only the key is asked. The base URL, API style, provider name, model and prices come from the catalog. `/refresh-models` downloads the latest list; it is also fetched when a week old. A trimmed copy (about 1.3 MB) is kept in the rig home, not in the binary, so the binary does not grow with the catalog.
 - `/summary`: a short account of the session (goal, what was done, files changed, open items), shown without changing the history.
 - `rig update`: checks the latest release and downloads it. `--check` only reports, `--off` and `--on` control automatic checks, and `--rollback` returns to the previous version.
 - Automatic updates: at most once every 20 hours rig checks GitHub in the background. A newer release is downloaded, its signature and checksum are verified, it runs and reports the right version, and only then is it staged. The next start swaps it in and keeps the old binary as `rig.prev`. The footer says when an update is ready.
