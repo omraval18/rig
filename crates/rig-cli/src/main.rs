@@ -19,6 +19,7 @@ mod style;
 mod subcommands;
 mod transcript;
 mod tui;
+mod update;
 mod view;
 
 use app::{App, RunOpts};
@@ -81,6 +82,22 @@ enum Cmd {
     /// Save API keys in the active profile (they beat environment variables)
     #[command(subcommand)]
     Key(KeyCmd),
+    /// Download the latest rig (verified), used on the next start. Checks run automatically
+    /// at most once a day.
+    Update {
+        /// Only report the latest release
+        #[arg(long, conflicts_with_all = ["off", "on", "rollback"])]
+        check: bool,
+        /// Stop automatic checks (manual `rig update` still works)
+        #[arg(long, conflicts_with_all = ["on", "rollback"])]
+        off: bool,
+        /// Turn automatic checks back on
+        #[arg(long, conflicts_with_all = ["rollback"])]
+        on: bool,
+        /// Go back to the version before the last update
+        #[arg(long)]
+        rollback: bool,
+    },
     /// List providers, default models and credential status
     Models,
     /// Check the local setup
@@ -130,6 +147,17 @@ fn default_autonomy(argv0: Option<&std::ffi::OsStr>) -> Option<&'static str> {
     (name == "rigd").then_some("high")
 }
 
+/// Starts `bin` in place of this process, keeping the name it was started under (so `rigd` stays
+/// `rigd`). Returns only if starting it failed; this process then carries on.
+fn restart_as(bin: &std::path::Path) {
+    use std::os::unix::process::CommandExt;
+    let argv0 = std::env::args_os().next().unwrap_or_else(|| "rig".into());
+    let _ = std::process::Command::new(bin)
+        .arg0(argv0)
+        .args(std::env::args_os().skip(1))
+        .exec();
+}
+
 fn main() {
     let mut cli = Cli::parse();
     if cli.opts.auto.is_none() {
@@ -138,6 +166,36 @@ fn main() {
     // Profile management must work even when the profile in use is broken or missing.
     if let Some(Cmd::Profile(cmd)) = &cli.cmd {
         std::process::exit(subcommands::profile(cmd, cli.opts.profile.as_deref()));
+    }
+    let (base, _) = config::Paths::base();
+    let exe = std::env::current_exe().and_then(std::fs::canonicalize).ok();
+    if let Some(Cmd::Update {
+        check,
+        off,
+        on,
+        rollback,
+    }) = &cli.cmd
+    {
+        let action = match (*check, *off, *on, *rollback) {
+            (_, _, _, true) => update::Action::Rollback,
+            (true, _, _, _) => update::Action::Check,
+            (_, true, _, _) => update::Action::Off,
+            (_, _, true, _) => update::Action::On,
+            _ => update::Action::Install,
+        };
+        let Some(exe) = exe else {
+            eprintln!("error: cannot find the rig binary to update");
+            std::process::exit(1);
+        };
+        std::process::exit(update::command(&base, &exe, action));
+    }
+    // A verified update staged by an earlier run is swapped in before anything else starts. Then
+    // this run continues as the new binary.
+    if let Some(exe) = &exe {
+        if let Some(new_bin) = update::apply_staged(&base, exe) {
+            restart_as(&new_bin);
+        }
+        update::check_in_background(&base, exe);
     }
     let app = match App::load(cli.opts.profile.as_deref()) {
         Ok(a) => a,
@@ -164,6 +222,7 @@ fn main() {
         Some(Cmd::Doctor) => subcommands::doctor(&app),
         Some(Cmd::Key(cmd)) => subcommands::key(app, &cmd),
         Some(Cmd::Profile(_)) => 0,
+        Some(Cmd::Update { .. }) => unreachable!("handled before the app starts"),
     };
     std::process::exit(code);
 }

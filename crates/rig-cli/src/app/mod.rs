@@ -35,6 +35,8 @@ pub struct App {
     pub cwd: PathBuf,
     /// What you picked last time (see `state.rs`).
     pub state: crate::state::State,
+    /// A verified update waiting for the next start, read once at startup for the footer.
+    pub staged_update: Option<crate::update::release::Version>,
 }
 
 impl App {
@@ -46,12 +48,14 @@ impl App {
         let cfg = Config::load(&paths.config_files(&cwd))?;
         let state = crate::state::State::load(&paths.state_file());
         let keys = crate::keys::Keys::load(&paths.keys_file());
+        let staged_update = crate::update::staged_version(&paths.base);
         Ok(App {
             paths,
             cfg,
             keys,
             cwd,
             state,
+            staged_update,
         })
     }
 

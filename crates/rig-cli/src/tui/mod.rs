@@ -72,6 +72,8 @@ pub struct Tui {
     pub quit: bool,
     /// Set by `/profile`: on quit, rig starts again in this profile.
     pub switch_profile: Option<String>,
+    /// When the footer last looked for a staged update (see `main_loop`).
+    pub update_poll: Instant,
     ctrl_c_at: Option<Instant>,
     pub dirty: bool,
     saved_allowlist: Vec<String>,
@@ -243,6 +245,7 @@ impl Tui {
             stats: Stats::default(),
             quit: false,
             switch_profile: None,
+            update_poll: Instant::now(),
             ctrl_c_at: None,
             dirty: true,
             saved_allowlist,

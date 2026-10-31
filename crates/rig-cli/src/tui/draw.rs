@@ -29,6 +29,9 @@ impl Tui {
         if !self.signed_in() {
             left.push((" · not signed in".into(), style::YELLOW));
         }
+        if let Some(v) = self.app.staged_update {
+            left.push((format!(" · rig {v} ready, restart to update"), style::GREEN));
+        }
         let right = match self.info.ctx_pct {
             Some(p) => vec![(format!("{p}% ctx"), style::context(p))],
             None if self.info.context_window > 0 => vec![("0% ctx".to_string(), "")],
