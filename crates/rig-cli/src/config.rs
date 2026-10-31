@@ -135,6 +135,11 @@ impl Paths {
         self.root.join("keys.json")
     }
 
+    /// Providers the user added from the UI, for this profile (`providers.json`).
+    pub fn providers_file(&self) -> PathBuf {
+        self.root.join("providers.json")
+    }
+
     pub fn history_file(&self) -> PathBuf {
         self.root.join("history")
     }
@@ -173,9 +178,14 @@ pub fn default_model(provider: &str) -> Option<&'static str> {
     Some(match provider {
         "chatgpt" | "openai" => "gpt-6-sol",
         "anthropic" => "claude-sonnet-5-5",
-        "xai" => "grok-4",
+        "xai" => "grok-4.7",
         "openrouter" => "anthropic/claude-sonnet-5-5",
         "ollama" => "qwen3-coder",
+        "gemini" => "gemini-3.8-flash",
+        "deepseek" => "deepseek-v4-flash",
+        "minimax" => "MiniMax-M3",
+        "zai" => "glm-5.3",
+        "kimi" => "kimi-k3",
         _ => return None,
     })
 }

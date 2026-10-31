@@ -1,10 +1,18 @@
 //! The text box over the composer: typing an API key, or naming a new profile.
 
 use super::Tui;
-use crate::config::default_model;
 use crate::entry::{Entry, Purpose};
+use crate::picker::{PickItem, PickKind};
 use crate::profile;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use rig_provider::{Kind, ProviderSpec};
+
+/// A base URL on this machine may be plain http and may have no key.
+fn is_local(url: &str) -> bool {
+    ["http://localhost", "http://127.0.0.1", "http://[::1]"]
+        .iter()
+        .any(|p| url.starts_with(p))
+}
 
 impl Tui {
     /// Ask for a provider's API key. Enter saves it in the active profile and switches to the provider.
@@ -27,6 +35,34 @@ impl Tui {
             purpose: Purpose::NewProfile,
             title: "New profile name".into(),
             hint: "letters, digits, '-' and '_'; it gets its own logins and keys".into(),
+            value: String::new(),
+            secret: false,
+        });
+    }
+
+    /// Start adding a provider: first its name, then the API style, the URL, the key and the model.
+    pub(crate) fn open_provider_entry(&mut self) {
+        self.open_entry(Entry {
+            purpose: Purpose::ProviderName,
+            title: "Name for the new provider".into(),
+            hint: "letters, digits, '-' and '_'; it is what you will type after the slash".into(),
+            value: String::new(),
+            secret: false,
+        });
+    }
+
+    /// The API style was picked; the value is `kind|name`.
+    pub(crate) fn provider_kind_picked(&mut self, value: &str) {
+        let Some((kind, name)) = value.split_once('|') else {
+            return;
+        };
+        self.open_entry(Entry {
+            purpose: Purpose::ProviderUrl {
+                name: name.into(),
+                kind: kind.into(),
+            },
+            title: format!("Base URL for {name}"),
+            hint: "the API root, such as https://api.example.com/v1 (no /chat/completions)".into(),
             value: String::new(),
             secret: false,
         });
@@ -73,6 +109,17 @@ impl Tui {
         let result = match &entry.purpose {
             Purpose::ApiKey { provider } => self.save_key(provider, &value),
             Purpose::NewProfile => self.create_profile(&value),
+            Purpose::ProviderName => self.provider_name_given(&value),
+            Purpose::ProviderUrl { name, kind } => self.provider_url_given(name, kind, &value),
+            Purpose::ProviderKey { name, kind, url } => {
+                self.provider_key_given(name, kind, url, &value)
+            }
+            Purpose::ProviderModel {
+                name,
+                kind,
+                url,
+                key,
+            } => self.save_provider(name, kind, url, key, &value),
         };
         if let Err(e) = result {
             self.error(&e);
@@ -85,15 +132,121 @@ impl Tui {
         if key.is_empty() {
             return Err("no key entered; nothing saved".into());
         }
-        let model = default_model(provider)
+        let spec = self.app.provider_spec(provider)?;
+        let model = self
+            .app
+            .default_model_of(&spec)
             .ok_or_else(|| format!("no default model for {provider}; pick one with /model"))?;
         self.app.keys.set(provider, key);
         self.app.keys.save(&self.app.paths.keys_file())?;
-        self.switch_model(provider, model)?;
+        self.switch_model(provider, &model)?;
         self.say(&format!(
             "Saved the {provider} key in profile '{}' and switched to {provider}/{model}.",
             self.app.paths.profile
         ));
+        Ok(())
+    }
+
+    /// Save a provider the user added, its key, and switch to it with the model they gave.
+    fn save_provider(
+        &mut self,
+        name: &str,
+        kind: &str,
+        url: &str,
+        key: &str,
+        model: &str,
+    ) -> Result<(), String> {
+        profile::validate(name)?;
+        let spec = ProviderSpec {
+            name: name.into(),
+            kind: if kind == "anthropic" {
+                Kind::Anthropic
+            } else {
+                Kind::Chat
+            },
+            base_url: url.trim_end_matches('/').into(),
+            api_key_env: None,
+            api_key: None,
+            chatgpt_plan: false,
+            keyless: key.is_empty(),
+            web_search: false,
+            default_model: Some(model.into()),
+        };
+        crate::providers::save(&self.app.paths.providers_file(), &spec)?;
+        self.app.cfg.providers.insert(name.into(), spec);
+        if !key.is_empty() {
+            self.app.keys.set(name, key);
+            self.app.keys.save(&self.app.paths.keys_file())?;
+        }
+        self.switch_model(name, model)?;
+        self.say(&format!("Added {name} and switched to {name}/{model}."));
+        Ok(())
+    }
+
+    fn provider_name_given(&mut self, name: &str) -> Result<(), String> {
+        profile::validate(name)?;
+        if self.app.cfg.providers.contains_key(name) {
+            return Err(format!("'{name}' is already a provider; pick another name"));
+        }
+        self.open_picker(
+            PickKind::ProviderKind,
+            &format!("API style for {name}"),
+            vec![
+                PickItem::new("OpenAI-compatible", format!("chat|{name}"))
+                    .detail("chat completions, such as DeepSeek, Z.ai, Kimi, Ollama"),
+                PickItem::new("Anthropic-compatible", format!("anthropic|{name}"))
+                    .detail("messages API, such as MiniMax's Anthropic endpoint"),
+            ],
+        );
+        Ok(())
+    }
+
+    fn provider_url_given(&mut self, name: &str, kind: &str, url: &str) -> Result<(), String> {
+        let url = url.trim();
+        let web = url.starts_with("https://") && url.len() > "https://".len();
+        if !(web || (url.starts_with("http://") && is_local(url))) {
+            return Err(
+                "the base URL must start with https:// (http:// only for this machine)".into(),
+            );
+        }
+        self.open_entry(Entry {
+            purpose: Purpose::ProviderKey {
+                name: name.into(),
+                kind: kind.into(),
+                url: url.into(),
+            },
+            title: format!("API key for {name}"),
+            hint:
+                "stored in keys.json, only you can read it; leave empty for a server without a key"
+                    .into(),
+            value: String::new(),
+            secret: true,
+        });
+        Ok(())
+    }
+
+    fn provider_key_given(
+        &mut self,
+        name: &str,
+        kind: &str,
+        url: &str,
+        key: &str,
+    ) -> Result<(), String> {
+        if key.is_empty() && !is_local(url) {
+            return Err("this server needs a key; type it, or use a local URL".into());
+        }
+        self.open_entry(Entry {
+            purpose: Purpose::ProviderModel {
+                name: name.into(),
+                kind: kind.into(),
+                url: url.into(),
+                key: key.into(),
+            },
+            title: format!("Model ID for {name}"),
+            hint: "exactly as the provider names it, such as gpt-6-sol or deepseek-v4-flash".into(),
+            value: String::new(),
+            secret: false,
+        });
         Ok(())
     }
 

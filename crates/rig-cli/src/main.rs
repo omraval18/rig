@@ -11,6 +11,7 @@ mod markdown;
 mod picker;
 mod plain;
 mod profile;
+mod providers;
 mod question;
 mod runtime;
 mod screen;

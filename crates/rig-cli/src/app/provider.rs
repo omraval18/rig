@@ -64,9 +64,10 @@ impl App {
             }
             _ => {
                 let spec = self.provider_spec(m)?;
-                let model = default_model(m)
+                let model = self
+                    .default_model_of(&spec)
                     .ok_or_else(|| format!("no default model for '{m}'; use {m}/<model>"))?;
-                Ok((spec, model.to_string()))
+                Ok((spec, model))
             }
         }
     }
@@ -112,6 +113,13 @@ impl App {
         } else {
             Credential::Missing(var.to_string())
         }
+    }
+
+    /// The model a provider starts with: the one it was added with, else the built-in default.
+    pub fn default_model_of(&self, spec: &ProviderSpec) -> Option<String> {
+        spec.default_model
+            .clone()
+            .or_else(|| default_model(&spec.name).map(String::from))
     }
 
     pub fn has_credentials(&self, spec: &ProviderSpec) -> bool {
