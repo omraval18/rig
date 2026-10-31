@@ -21,6 +21,9 @@ pub struct Config {
     /// Extra or overriding providers, keyed by name.
     #[serde(default)]
     pub providers: BTreeMap<String, ProviderSpec>,
+    /// MCP servers, keyed by name (`[mcp.<name>]`).
+    #[serde(default)]
+    pub mcp: BTreeMap<String, rig_mcp::ServerSpec>,
 }
 
 impl Config {
@@ -39,6 +42,7 @@ impl Config {
             out.context_window = c.context_window.or(out.context_window);
             out.auto_compact_percent = c.auto_compact_percent.or(out.auto_compact_percent);
             out.providers.extend(c.providers);
+            out.mcp.extend(c.mcp);
         }
         Ok(out)
     }

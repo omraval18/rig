@@ -190,6 +190,20 @@ impl Tui {
         self.launch(Job::Compact);
     }
 
+    /// `/mcp`: the configured servers and their state. Servers start when the model first uses them.
+    pub(super) fn cmd_mcp(&mut self) {
+        let lines = self.app.mcp.status();
+        if lines.is_empty() {
+            return self.say(
+                "No MCP servers. Add one under [mcp.<name>] in config.toml, with command and args.",
+            );
+        }
+        self.say(&format!(
+            "MCP servers (they start when the model first uses one):\n  {}",
+            lines.join("\n  ")
+        ));
+    }
+
     /// Summarize the session in the background; the summary is shown when it is ready.
     pub(super) fn cmd_summary(&mut self) {
         if !self.idle_agent() {

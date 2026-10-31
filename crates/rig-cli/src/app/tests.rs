@@ -21,6 +21,7 @@ fn app(state: State, cfg_model: Option<&str>) -> App {
         cfg,
         keys: crate::keys::Keys::default(),
         staged_update: None,
+        mcp: std::sync::Arc::new(rig_mcp::Hub::new(&Default::default())),
         cwd: std::env::temp_dir(),
         state,
     }

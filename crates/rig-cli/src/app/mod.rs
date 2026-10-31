@@ -37,6 +37,8 @@ pub struct App {
     pub state: crate::state::State,
     /// A verified update waiting for the next start, read once at startup for the footer.
     pub staged_update: Option<crate::update::release::Version>,
+    /// The MCP servers from the config. Nothing is started until the model uses one.
+    pub mcp: std::sync::Arc<rig_mcp::Hub>,
 }
 
 impl App {
@@ -49,6 +51,7 @@ impl App {
         let state = crate::state::State::load(&paths.state_file());
         let keys = crate::keys::Keys::load(&paths.keys_file());
         let staged_update = crate::update::staged_version(&paths.base);
+        let mcp = std::sync::Arc::new(rig_mcp::Hub::new(&cfg.mcp));
         Ok(App {
             paths,
             cfg,
@@ -56,6 +59,7 @@ impl App {
             cwd,
             state,
             staged_update,
+            mcp,
         })
     }
 
@@ -123,7 +127,10 @@ impl App {
     }
 
     pub fn reminder(&self, skills: &[Skill]) -> Message {
-        let extra = skills::catalog_text(skills);
+        let mut extra = skills::catalog_text(skills);
+        if let Some(line) = rig_mcp::catalog(&self.mcp) {
+            extra.push_str(&format!("\n{line}\n"));
+        }
         Message::user(session_context(&ContextInput {
             cwd: &self.cwd,
             home: self.paths.home.as_deref(),

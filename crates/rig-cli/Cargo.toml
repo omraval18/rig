@@ -12,6 +12,7 @@ path = "src/main.rs"
 rig-core.workspace = true
 rig-tools.workspace = true
 rig-provider.workspace = true
+rig-mcp.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 clap = { version = "4", default-features = false, features = ["std", "derive", "help", "usage", "error-context"] }
