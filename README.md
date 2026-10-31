@@ -123,6 +123,8 @@ The footer reads `model · effort <level> · permissions <level>`: reasoning eff
 
 `auto` is accepted for `low` and `full-access` for `high`; `ask` asks before every edit or command. Anything above the level is an approval prompt in the UI (yes / no / always; "always" rules persist in the profile's `allowlist.json`) and a denial in `rig ask`. The model declares a `risk` for every command, but it is only a claim: `risk_floor` raises it for pushes, deletions, `sudo`, `curl | sh`, and similar.
 
+**Web search.** On a ChatGPT login or an OpenAI key, the model can search the web through the provider's own search tool, with no extra setup. Other providers have no built-in search yet; an MCP search server will cover them.
+
 **Updates.** rig checks GitHub for a new release at most once every 20 hours, in the background. A newer release is downloaded and its signature and checksum are verified before anything else happens. The next start swaps it in, and the footer says so when an update is ready. Set `RIG_NO_UPDATE=1` to stop automatic checks, or run `rig update --off`. `rig update` checks and downloads now, `rig update --check` only reports, and `rig update --rollback` goes back to the previous version. Homebrew installs and development builds (under `target/`) are left alone: rig downloads nothing for them, and `brew upgrade rig` is the way to update a Homebrew install.
 
 **`rigd` is full access.** It is the same binary under another name: `rigd` starts every run at `high`, so nothing asks for approval, including `rm`, pushes and `curl | sh`. Use it only in a checkout or container you don't mind the agent changing. `rig --auto <level>` still picks a level for `rig`.
