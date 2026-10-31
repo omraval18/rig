@@ -21,13 +21,16 @@ pub struct Responses {
     ep: Endpoint,
     /// ChatGPT-plan backend: adds `originator`/`session_id` headers.
     chatgpt_backend: bool,
+    /// Offer the provider's hosted web search tool alongside our own tools.
+    web_search: bool,
 }
 
 impl Responses {
-    pub(crate) fn new(ep: Endpoint, chatgpt_backend: bool) -> Self {
+    pub(crate) fn new(ep: Endpoint, chatgpt_backend: bool, web_search: bool) -> Self {
         Self {
             ep,
             chatgpt_backend,
+            web_search,
         }
     }
 
@@ -47,6 +50,12 @@ impl Responses {
             "include": ["reasoning.encrypted_content"],
             "prompt_cache_key": req.session_id,
         });
+        if self.web_search {
+            // The provider runs the search itself; its results come back inside the reply.
+            body["tools"]
+                .as_array_mut()
+                .map(|tools| tools.push(json!({"type": "web_search"})));
+        }
         if let Some(e) = req.effort {
             body["reasoning"] = json!({"effort": e.as_str(), "summary": "auto"});
         }

@@ -48,6 +48,9 @@ pub struct ProviderSpec {
     /// The server needs no credential (e.g. a local Ollama).
     #[serde(default)]
     pub keyless: bool,
+    /// Let the provider run its own web search (a hosted tool). Only the Responses API has one.
+    #[serde(default)]
+    pub web_search: bool,
 }
 
 /// Providers available without any configuration.
@@ -60,11 +63,13 @@ pub fn builtin_specs() -> Vec<ProviderSpec> {
         api_key: None,
         chatgpt_plan: false,
         keyless: env.is_none(),
+        web_search: false,
     };
     vec![
         ProviderSpec {
             chatgpt_plan: true,
             keyless: false,
+            web_search: true,
             ..spec(
                 "chatgpt",
                 Kind::Responses,
@@ -72,12 +77,15 @@ pub fn builtin_specs() -> Vec<ProviderSpec> {
                 None,
             )
         },
-        spec(
-            "openai",
-            Kind::Responses,
-            "https://api.openai.com/v1",
-            Some("OPENAI_API_KEY"),
-        ),
+        ProviderSpec {
+            web_search: true,
+            ..spec(
+                "openai",
+                Kind::Responses,
+                "https://api.openai.com/v1",
+                Some("OPENAI_API_KEY"),
+            )
+        },
         spec(
             "anthropic",
             Kind::Anthropic,
@@ -137,7 +145,11 @@ pub fn build(
         auth,
     );
     Ok(match spec.kind {
-        Kind::Responses => Box::new(responses::Responses::new(ep, spec.chatgpt_plan)),
+        Kind::Responses => Box::new(responses::Responses::new(
+            ep,
+            spec.chatgpt_plan,
+            spec.web_search,
+        )),
         Kind::Anthropic => Box::new(anthropic::Anthropic::new(ep)),
         Kind::Chat => Box::new(chat::ChatCompletions::new(ep)),
     })
