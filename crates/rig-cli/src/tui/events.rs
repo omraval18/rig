@@ -20,6 +20,16 @@ impl Tui {
             if self.prompt.completion.as_ref().is_some_and(|c| c.loading) && self.index.ready() {
                 self.refresh_completion();
             }
+            // A background download can finish while rig is open: show it in the footer once it has.
+            if self.app.staged_update.is_none()
+                && self.update_poll.elapsed() >= Duration::from_secs(30)
+            {
+                self.update_poll = Instant::now();
+                if let Some(v) = crate::update::staged_version(&self.app.paths.base) {
+                    self.app.staged_update = Some(v);
+                    self.dirty = true;
+                }
+            }
             if self
                 .display
                 .notice

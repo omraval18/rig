@@ -20,6 +20,7 @@ fn app(state: State, cfg_model: Option<&str>) -> App {
         paths: Paths::for_profile(root, crate::profile::DEFAULT.into(), None),
         cfg,
         keys: crate::keys::Keys::default(),
+        staged_update: None,
         cwd: std::env::temp_dir(),
         state,
     }
