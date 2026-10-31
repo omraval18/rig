@@ -24,8 +24,13 @@ pub trait Ui {
     /// Percent of the context window the next request will use, when the window is known.
     fn context(&mut self, _percent: Option<u8>) {}
     /// Messages the user typed while the turn was running, delivered at the next model step.
-    fn steering(&mut self) -> Vec<Message> {
+    fn queued(&mut self) -> Vec<Message> {
         Vec::new()
+    }
+    /// Ask the user a question with options; `None` means no answer (non-interactive, or cancelled).
+    /// The user can always type an answer of their own.
+    fn ask(&mut self, _question: &str, _options: &[String]) -> Option<String> {
+        None
     }
     /// Ask the user to approve a gated call. Non-interactive front ends answer `No`.
     /// `remember` names the rule an "always" answer would store, when one is possible.

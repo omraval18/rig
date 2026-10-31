@@ -46,6 +46,11 @@ impl Tui {
                 reply,
             } => self.ask_approval(&name, desc, reason, remember, reply),
             Ev::Done { agent, result } => self.finish_job(agent, result),
+            Ev::Question {
+                question,
+                options,
+                reply,
+            } => self.open_question(question, options, reply),
             Ev::Models { provider, models } => self.on_models(&provider, models),
             Ev::Notice(text) => self.say(&text),
             Ev::RolledBack => self.turn.rolled_back = true,

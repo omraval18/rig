@@ -52,6 +52,7 @@ impl Tui {
             Cmd::Rename => self.cmd_rename(arg),
             Cmd::Fork => self.cmd_fork(),
             Cmd::Compact => self.cmd_compact(),
+            Cmd::Summary => self.cmd_summary(),
             Cmd::Undo => self.cmd_undo(),
             Cmd::Paste => self.paste_clipboard_image(),
             Cmd::Copy => self.cmd_copy(),

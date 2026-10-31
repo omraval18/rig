@@ -149,7 +149,7 @@ impl Policy {
     pub fn decide(&self, access: &Access) -> Decision {
         let autonomy = self.autonomy();
         match access {
-            Access::Read | Access::Network => Decision::Allow,
+            Access::Read | Access::Network | Access::Ask { .. } => Decision::Allow,
             Access::Write => match autonomy {
                 Autonomy::ReadOnly => {
                     Decision::Deny("editing files is disabled in read-only mode".into())

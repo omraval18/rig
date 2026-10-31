@@ -36,6 +36,11 @@ pub enum Access {
     Exec { risk: Risk, command: String },
     /// Reads from the network.
     Network,
+    /// Asks the user a question. Always allowed; the front end answers it.
+    Ask {
+        question: String,
+        options: Vec<String>,
+    },
 }
 
 impl Access {

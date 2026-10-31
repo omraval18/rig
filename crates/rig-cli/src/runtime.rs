@@ -19,6 +19,8 @@ use std::time::Duration;
 pub enum Job {
     Turn(Message),
     Compact,
+    /// `/summary`: read the session and show a summary; nothing is changed.
+    Summary,
 }
 
 pub enum Ev {
@@ -43,6 +45,12 @@ pub enum Ev {
         remember: Option<String>,
         reply: Sender<Approval>,
     },
+    /// The agent asks the person something; the answer (or `None`) goes back on `reply`.
+    Question {
+        question: String,
+        options: Vec<String>,
+        reply: Sender<Option<String>>,
+    },
     Done {
         agent: Box<Agent>,
         result: Result<JobOutcome, AgentError>,
@@ -63,11 +71,13 @@ pub struct JobOutcome {
     /// Set by `/compact`: how many messages and tool calls were archived.
     pub compacted: Option<(usize, usize, usize)>,
     pub nothing_to_compact: bool,
+    /// Set by `/summary`.
+    pub summary: Option<String>,
 }
 
 pub struct ChannelUi {
     pub tx: Sender<Ev>,
-    pub steer: Arc<Mutex<VecDeque<Message>>>,
+    pub queue: Arc<Mutex<VecDeque<Message>>>,
     pub session: Arc<Mutex<Session>>,
     pub shared: Arc<Shared>,
 }
@@ -133,8 +143,30 @@ impl Ui for ChannelUi {
         let _ = self.tx.send(Ev::RolledBack);
     }
 
-    fn steering(&mut self) -> Vec<Message> {
-        self.steer.locked().drain(..).collect()
+    fn queued(&mut self) -> Vec<Message> {
+        self.queue.locked().drain(..).collect()
+    }
+
+    fn ask(&mut self, question: &str, options: &[String]) -> Option<String> {
+        let (reply, answer) = channel();
+        let ev = Ev::Question {
+            question: question.into(),
+            options: options.to_vec(),
+            reply,
+        };
+        if self.tx.send(ev).is_err() {
+            return None;
+        }
+        loop {
+            if self.shared.cancel.load(Ordering::Relaxed) {
+                return None;
+            }
+            match answer.recv_timeout(Duration::from_millis(100)) {
+                Ok(a) => return a,
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                Err(_) => return None,
+            }
+        }
     }
 
     fn approve(
@@ -173,6 +205,13 @@ pub fn spawn(mut agent: Box<Agent>, job: Job, mut ui: ChannelUi) {
     std::thread::spawn(move || {
         let result = match job {
             Job::Turn(msg) => agent.run_turn(msg, &mut ui).map(|()| JobOutcome::default()),
+            Job::Summary => agent
+                .summarize()
+                .map(|text| JobOutcome {
+                    summary: Some(text),
+                    ..JobOutcome::default()
+                })
+                .map_err(Into::into),
             Job::Compact => match agent.compact(&mut ui) {
                 Ok(Some(cp)) => Ok(JobOutcome {
                     compacted: Some((
@@ -180,11 +219,11 @@ pub fn spawn(mut agent: Box<Agent>, job: Job, mut ui: ChannelUi) {
                         cp.archived_tool_calls,
                         cp.unverified_handles,
                     )),
-                    nothing_to_compact: false,
+                    ..JobOutcome::default()
                 }),
                 Ok(None) => Ok(JobOutcome {
-                    compacted: None,
                     nothing_to_compact: true,
+                    ..JobOutcome::default()
                 }),
                 Err(e) => Err(e.into()),
             },

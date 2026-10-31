@@ -48,14 +48,14 @@ impl Tui {
             ))
         } else {
             self.turn.running.map(|t| {
-                let queued = self.steer.locked().len();
+                let queued = self.queue.locked().len();
                 let q = if queued > 0 {
                     format!(" · {queued} queued")
                 } else {
                     String::new()
                 };
                 format!(
-                    "{} Working {}s · Esc to interrupt · Enter to steer{q}",
+                    "{} Working {}s · Esc to interrupt · Enter to queue{q}",
                     SPIN[self.display.spinner % SPIN.len()],
                     t.elapsed().as_secs()
                 )
@@ -84,6 +84,7 @@ impl Tui {
             completion: self.prompt.completion.as_ref(),
             picker: self.prompt.picker.as_ref(),
             entry: self.prompt.entry.as_ref(),
+            question: self.prompt.question.as_ref().map(|p| &p.view),
             approval: approval_view,
             partial: &self.turn.partial,
             activity,

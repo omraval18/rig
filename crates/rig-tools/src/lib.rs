@@ -1,5 +1,6 @@
 //! Built-in tools. Names are snake_case verbs; every path parameter is called `path`.
 
+mod ask;
 mod context_tools;
 mod exec;
 mod fetch;
@@ -27,6 +28,7 @@ pub fn builtin() -> Registry {
         Box::new(fetch::FetchPage),
         Box::new(context_tools::UseSkill),
         Box::new(context_tools::Recall),
+        Box::new(ask::AskUser),
     ];
     Registry::new(tools)
 }

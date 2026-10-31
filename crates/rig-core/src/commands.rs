@@ -24,6 +24,7 @@ pub enum Cmd {
     Copy,
     Paste,
     Compact,
+    Summary,
     Reasoning,
     Settings,
     Version,
@@ -173,6 +174,14 @@ pub static COMMANDS: &[Spec] = &[
         "choose the reasoning effort",
         Category::Model,
         true,
+    ),
+    spec(
+        Cmd::Summary,
+        "summary",
+        "/summary",
+        "summarize this session (the history is not changed)",
+        Category::Session,
+        false,
     ),
     spec(
         Cmd::Reasoning,

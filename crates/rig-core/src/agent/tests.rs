@@ -182,7 +182,7 @@ fn steering_is_delivered_before_the_next_model_step() {
     ]);
     struct Steer(bool);
     impl Ui for Steer {
-        fn steering(&mut self) -> Vec<Message> {
+        fn queued(&mut self) -> Vec<Message> {
             // Only after the first model step has run (tools executed).
             if std::mem::replace(&mut self.0, true) {
                 vec![Message::user("actually, use the other file")]
@@ -209,7 +209,7 @@ fn steering_is_delivered_before_the_next_model_step() {
         .unwrap();
     assert!(
         steer_at > result_at,
-        "steering must follow the tool results it interrupts"
+        "queued must follow the tool results it interrupts"
     );
 }
 

@@ -64,12 +64,12 @@ rig -c                                # continue the latest session in this dire
 | `/` | command popup with descriptions; arguments complete too (`/model gpt`, `/skills cr`) |
 | `@` | file mention. Gitignore-aware fuzzy search over the workspace; exact name > prefix > word start > scattered, shallow paths first. `Tab` opens a folder, `Enter` mentions it. `@~`, `@.`, `@..` browse home, workspace, parent. Mentioned files (up to 24 KB each) are inlined, so the model doesn't need a `Read` call |
 | `$` | skill. Lists `SKILL.md` skills from `.rig/ .agents/ .claude/` `skills/` in the project and home; `$name` activates one for that message |
-| `Enter` while working | steers: the message is delivered after the current tool call, before the next model call |
+| `Enter` while working | queues: the message is delivered after the current tool call, before the next model call |
 | `Esc` | interrupts the turn (streaming and running commands stop immediately) |
 | `Shift+Tab` / `Ctrl+P` | cycle permissions / model picker |
 | `Alt+Enter`, `Ctrl+J`, trailing `\` | newline |
 
-Commands: `/new` (`/clear`), `/resume`, `/fork`, `/rename`, `/compact`, `/model`, `/effort`, `/permissions`, `/allowlist`, `/undo`, `/skills [list|show|create|path]`, `/copy`, `/reasoning`, `/status`, `/settings`, `/provider`, `/profile`, `/login`, `/logout`, `/stats`, `/version`, `/help`, `/quit`. `/help` groups them.
+Commands: `/new` (`/clear`), `/resume`, `/fork`, `/rename`, `/compact`, `/model`, `/effort`, `/permissions`, `/allowlist`, `/undo`, `/skills [list|show|create|path]`, `/copy`, `/reasoning`, `/status`, `/summary`, `/settings`, `/provider`, `/profile`, `/login`, `/logout`, `/stats`, `/version`, `/help`, `/quit`. `/help` groups them.
 
 ### Full-window UI
 
@@ -78,6 +78,10 @@ rig takes over the whole terminal window (the alternate screen, like vim): the c
 - **Scroll:** mouse wheel, PageUp / PageDown; End jumps back to the latest. Hold Shift (Option on macOS) to select text with the mouse, or turn mouse capture off in `/settings`. `/copy` copies the last reply.
 - **`/new`, `/resume`, `/fork`** clear the window down to the new session's own messages.
 - **Per-session settings:** every session records the model, effort and permissions it uses. `rig -c`, `rig --resume <id>` and `/resume` bring that session's own setup back, whatever other sessions used since (flags still win). New chats use what you used last.
+
+### Questions
+
+The agent can stop and ask you something when a choice changes the result. It shows the question with numbered options, and the last row is always "Type something…" for an answer of your own. Press a number, or move with the arrow keys and Enter. Esc skips the question, and the agent carries on without an answer.
 
 ### Images
 
@@ -203,7 +207,7 @@ It uses the Codex CLI's public OAuth client id and the undocumented `chatgpt.com
 
 Subagents (`Task`), MCP, `WebSearch`, PDF input, hooks, Anthropic extended thinking, Cursor and Grok *subscription* login (Grok works today with an `XAI_API_KEY`), the Responses "custom tool" grammar for `edit_files` (it is sent as a normal function tool), and these fx commands: `/mcp`, `/feedback`, `/trace`, `/alias`, `/usage`, `/fast`, `/sound`, `/workspace`, `/shell`.
 
-Testing: unit tests in every module (`cargo test`), plus pty-driven end-to-end scenarios against the live ChatGPT backend covering completion, pickers, mentions, skills, edit + undo, interrupt, approvals, steering, compaction + recall, resume/fork/new, paste and resize.
+Testing: unit tests in every module (`cargo test`), plus pty-driven end-to-end scenarios against the live ChatGPT backend covering completion, pickers, mentions, skills, edit + undo, interrupt, approvals, queued messages, compaction + recall, resume/fork/new, paste and resize.
 
 Known unverified: the browser sign-in has not been run end to end (OpenAI's authorize page is behind a Cloudflare challenge, so it cannot be tested headlessly). The Anthropic and Chat adapters are tested against a mock of their streaming formats, not live servers.
 

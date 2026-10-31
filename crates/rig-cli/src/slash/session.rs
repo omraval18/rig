@@ -190,6 +190,14 @@ impl Tui {
         self.launch(Job::Compact);
     }
 
+    /// Summarize the session in the background; the summary is shown when it is ready.
+    pub(super) fn cmd_summary(&mut self) {
+        if !self.idle_agent() {
+            return;
+        }
+        self.launch(Job::Summary);
+    }
+
     pub(super) fn cmd_undo(&mut self) {
         match rig_tools::undo_last(&self.shared) {
             Some(m) => self.say(&m),

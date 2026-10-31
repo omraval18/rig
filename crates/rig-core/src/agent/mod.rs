@@ -5,7 +5,7 @@
 //!   read-only calls run concurrently; an edit or command always runs alone;
 //! - a denied call is returned to the model as an error result, never silently dropped;
 //! - transient provider errors are retried only if nothing has been shown yet;
-//! - the user can cancel at any moment and steer between model steps;
+//! - the user can cancel at any moment and queue between model steps;
 //! - when the window fills, or the provider reports an overflow, older context is compacted.
 
 use crate::compact;
@@ -110,8 +110,8 @@ impl Agent {
             if self.cancelled() {
                 return Err(AgentError::Cancelled);
             }
-            for steer in ui.steering() {
-                self.push(steer, ui);
+            for queue in ui.queued() {
+                self.push(queue, ui);
             }
             if self.should_compact() {
                 // A failed automatic compaction must not end the turn; the overflow path retries it.
@@ -177,6 +177,16 @@ impl Agent {
     }
 
     /// Compact now. `Ok(None)` when there is nothing worth compacting.
+    /// A short summary of the session so far, for `/summary`. The history is not changed.
+    pub fn summarize(&self) -> Result<String, ProviderError> {
+        compact::summary::summarize(
+            self.provider.as_ref(),
+            &self.history,
+            &self.ctx.session_id,
+            &self.ctx.shared.cancel,
+        )
+    }
+
     pub fn compact(
         &mut self,
         ui: &mut dyn Ui,

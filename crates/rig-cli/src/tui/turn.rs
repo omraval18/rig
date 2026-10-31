@@ -23,6 +23,7 @@ impl Tui {
         self.agent = Some(agent);
         let elapsed = self.turn.running.take().map(|t| t.elapsed());
         self.prompt.approval = None;
+        self.prompt.question = None;
         match &result {
             Ok(o) => {
                 if let Some((m, t, bad)) = o.compacted {
@@ -37,6 +38,9 @@ impl Tui {
                 }
                 if o.nothing_to_compact {
                     self.say("Nothing to compact yet.");
+                }
+                if let Some(text) = &o.summary {
+                    self.say(&format!("Summary\n\n{text}"));
                 }
             }
             Err(AgentError::Cancelled) => self.say("Interrupted."),
@@ -82,13 +86,13 @@ impl Tui {
             self.saved_allowlist = rules;
         }
 
-        let queued: Vec<Message> = self.steer.locked().drain(..).collect();
+        let queued: Vec<Message> = self.queue.locked().drain(..).collect();
         if matches!(result, Err(AgentError::Cancelled)) {
             if !queued.is_empty() {
                 self.say(&format!("Dropped {} queued message(s).", queued.len()));
             }
         } else if !queued.is_empty() {
-            // The turn ended before the model took another step; run the steering as the next turn.
+            // The turn ended before the model took another step; run the queued as the next turn.
             let blocks = queued.into_iter().flat_map(|m| m.blocks).collect();
             self.launch(Job::Turn(Message {
                 role: Role::User,
@@ -101,7 +105,7 @@ impl Tui {
     pub fn channel_ui(&self) -> ChannelUi {
         ChannelUi {
             tx: self.tx.clone(),
-            steer: self.steer.clone(),
+            queue: self.queue.clone(),
             session: self.session.clone(),
             shared: self.shared.clone(),
         }
