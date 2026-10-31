@@ -1,6 +1,7 @@
 mod ansi;
 mod app;
 mod attach;
+mod catalog;
 mod complete;
 mod composer;
 mod config;

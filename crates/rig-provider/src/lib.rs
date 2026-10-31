@@ -54,6 +54,9 @@ pub struct ProviderSpec {
     /// The model used when none is named. Set for providers added by the user.
     #[serde(default)]
     pub default_model: Option<String>,
+    /// The models.dev provider id this came from, so its prices can be looked up.
+    #[serde(default)]
+    pub catalog_id: Option<String>,
 }
 
 /// Providers available without any configuration.
@@ -68,6 +71,7 @@ pub fn builtin_specs() -> Vec<ProviderSpec> {
         keyless: env.is_none(),
         web_search: false,
         default_model: None,
+        catalog_id: None,
     };
     vec![
         ProviderSpec {

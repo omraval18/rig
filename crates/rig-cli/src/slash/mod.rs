@@ -55,6 +55,7 @@ impl Tui {
             Cmd::Summary => self.cmd_summary(),
             Cmd::Loop => self.cmd_loop(arg),
             Cmd::Mcp => self.cmd_mcp(),
+            Cmd::RefreshModels => self.cmd_refresh_models(),
             Cmd::Undo => self.cmd_undo(),
             Cmd::Paste => self.paste_clipboard_image(),
             Cmd::Copy => self.cmd_copy(),
@@ -90,6 +91,7 @@ impl Tui {
             PickKind::Provider => self.pick_provider(&item.value),
             PickKind::Profile => self.cmd_profile(&item.value),
             PickKind::ProviderKind => self.provider_kind_picked(&item.value),
+            PickKind::CatalogMatch => self.catalog_match_picked(&item.value),
             PickKind::Settings => self.pick_setting(&item.value),
             PickKind::Skills => {
                 self.prompt

@@ -10,6 +10,8 @@ use rig_provider::chatgpt;
 
 /// The `/provider` row that starts adding a provider.
 const ADD_PROVIDER: &str = "add";
+/// The `/provider` row that searches the models.dev catalog.
+const SEARCH_CATALOG: &str = "search";
 
 impl Tui {
     pub(super) fn cmd_provider(&mut self) {
@@ -38,12 +40,19 @@ impl Tui {
             PickItem::new("+ Add provider…", ADD_PROVIDER)
                 .detail("any OpenAI- or Anthropic-compatible API"),
         );
+        items.push(
+            PickItem::new("Search models.dev…", SEARCH_CATALOG)
+                .detail("find a provider and model by name"),
+        );
         self.open_picker(PickKind::Provider, "Provider", items);
     }
 
     pub(super) fn pick_provider(&mut self, name: &str) {
         if name == ADD_PROVIDER {
             return self.open_provider_entry();
+        }
+        if name == SEARCH_CATALOG {
+            return self.open_catalog_search();
         }
         let Ok(spec) = self.app.provider_spec(name) else {
             return;
