@@ -25,6 +25,7 @@ pub enum Cmd {
     Paste,
     Compact,
     Summary,
+    Loop,
     Reasoning,
     Settings,
     Version,
@@ -175,6 +176,17 @@ pub static COMMANDS: &[Spec] = &[
         Category::Model,
         true,
     ),
+    Spec {
+        aliases: &["goal"],
+        ..spec(
+            Cmd::Loop,
+            "loop",
+            "/loop <objective> (/goal)",
+            "keep working toward an objective across turns until it is done",
+            Category::Session,
+            true,
+        )
+    },
     spec(
         Cmd::Summary,
         "summary",

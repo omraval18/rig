@@ -87,6 +87,8 @@ pub struct Shared {
     pub skills: RwLock<Vec<Skill>>,
     /// JSONL archive of compacted turns, searchable by the `recall` tool.
     pub archive: Mutex<Option<PathBuf>>,
+    /// Set by `update_goal` (`complete` or `blocked`); the front end reads and clears it after the turn.
+    pub goal_signal: Mutex<Option<String>>,
 }
 
 #[derive(Clone)]

@@ -36,6 +36,7 @@ mod draw;
 mod entry;
 mod events;
 mod format;
+mod goal;
 mod keys;
 mod output;
 mod provider;
@@ -75,6 +76,8 @@ pub struct Tui {
     pub switch_profile: Option<String>,
     /// When the footer last looked for a staged update (see `main_loop`).
     pub update_poll: Instant,
+    /// The `/loop` goal, while one is open.
+    pub goal: Option<goal::Goal>,
     ctrl_c_at: Option<Instant>,
     pub dirty: bool,
     saved_allowlist: Vec<String>,
@@ -247,6 +250,7 @@ impl Tui {
             quit: false,
             switch_profile: None,
             update_poll: Instant::now(),
+            goal: None,
             ctrl_c_at: None,
             dirty: true,
             saved_allowlist,

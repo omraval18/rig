@@ -42,8 +42,20 @@ impl Tui {
                 if let Some(text) = &o.summary {
                     self.say(&format!("Summary\n\n{text}"));
                 }
+                // A turn that ran as part of a goal is followed by the next round (or the end).
+                if o.compacted.is_none() && !o.nothing_to_compact && o.summary.is_none() {
+                    self.goal_after_turn();
+                }
             }
-            Err(AgentError::Cancelled) => self.say("Interrupted."),
+            Err(AgentError::Cancelled) => {
+                if self.goal.take().is_some() {
+                    self.say(
+                        "Interrupted. The goal is stopped; /loop <objective> starts it again.",
+                    );
+                } else {
+                    self.say("Interrupted.");
+                }
+            }
             Err(e) => {
                 let (msg, retry) = explain(e, &self.info.spec.name);
                 self.error(&msg);
