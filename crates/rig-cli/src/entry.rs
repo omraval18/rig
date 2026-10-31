@@ -3,9 +3,29 @@
 
 pub enum Purpose {
     /// Save an API key for this provider in the active profile.
-    ApiKey { provider: String },
+    ApiKey {
+        provider: String,
+    },
     /// Create a profile and switch to it.
     NewProfile,
+    /// Adding a provider, one answer per step: name, then (after the API style is picked) the
+    /// base URL, the key, and the model. Each step carries what the earlier ones gave.
+    ProviderName,
+    ProviderUrl {
+        name: String,
+        kind: String,
+    },
+    ProviderKey {
+        name: String,
+        kind: String,
+        url: String,
+    },
+    ProviderModel {
+        name: String,
+        kind: String,
+        url: String,
+        key: String,
+    },
 }
 
 pub struct Entry {

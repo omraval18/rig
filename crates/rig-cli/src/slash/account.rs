@@ -8,6 +8,9 @@ use crate::runtime::Ev;
 use crate::tui::Tui;
 use rig_provider::chatgpt;
 
+/// The `/provider` row that starts adding a provider.
+const ADD_PROVIDER: &str = "add";
+
 impl Tui {
     pub(super) fn cmd_provider(&mut self) {
         let items: Vec<PickItem> = self
@@ -30,10 +33,18 @@ impl Tui {
                     .current(s.name == self.info.spec.name)
             })
             .collect();
+        let mut items = items;
+        items.push(
+            PickItem::new("+ Add provider…", ADD_PROVIDER)
+                .detail("any OpenAI- or Anthropic-compatible API"),
+        );
         self.open_picker(PickKind::Provider, "Provider", items);
     }
 
     pub(super) fn pick_provider(&mut self, name: &str) {
+        if name == ADD_PROVIDER {
+            return self.open_provider_entry();
+        }
         let Ok(spec) = self.app.provider_spec(name) else {
             return;
         };

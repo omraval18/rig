@@ -11,6 +11,7 @@ pub enum PickKind {
     Fork,
     Provider,
     Profile,
+    ProviderKind,
     Skills,
     Settings,
 }

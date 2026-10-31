@@ -47,7 +47,10 @@ impl App {
         let cwd = std::env::current_dir()
             .map_err(|e| format!("cannot read the working directory: {e}"))?;
         let paths = Paths::discover(profile)?;
-        let cfg = Config::load(&paths.config_files(&cwd))?;
+        let mut cfg = Config::load(&paths.config_files(&cwd))?;
+        // Providers added from the UI are this profile's own; they win over same-named shared ones.
+        cfg.providers
+            .extend(crate::providers::load(&paths.providers_file()));
         let state = crate::state::State::load(&paths.state_file());
         let keys = crate::keys::Keys::load(&paths.keys_file());
         let staged_update = crate::update::staged_version(&paths.base);

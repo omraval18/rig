@@ -15,10 +15,10 @@ pub mod responses;
 use auth::{Auth, StaticHeader};
 use http::Endpoint;
 use rig_core::provider::{Provider, ProviderError};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Kind {
     /// OpenAI Responses API.
@@ -30,7 +30,7 @@ pub enum Kind {
 }
 
 /// A configured backend: where it lives and how it authenticates.
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProviderSpec {
     #[serde(default)]
     pub name: String,
@@ -51,6 +51,9 @@ pub struct ProviderSpec {
     /// Let the provider run its own web search (a hosted tool). Only the Responses API has one.
     #[serde(default)]
     pub web_search: bool,
+    /// The model used when none is named. Set for providers added by the user.
+    #[serde(default)]
+    pub default_model: Option<String>,
 }
 
 /// Providers available without any configuration.
@@ -64,6 +67,7 @@ pub fn builtin_specs() -> Vec<ProviderSpec> {
         chatgpt_plan: false,
         keyless: env.is_none(),
         web_search: false,
+        default_model: None,
     };
     vec![
         ProviderSpec {
@@ -105,6 +109,40 @@ pub fn builtin_specs() -> Vec<ProviderSpec> {
             Some("OPENROUTER_API_KEY"),
         ),
         spec("ollama", Kind::Chat, "http://localhost:11434/v1", None),
+        // Built-in presets for popular OpenAI- and Anthropic-compatible APIs. Base URLs and key
+        // variables come from models.dev; Gemini's OpenAI-compatible endpoint is documented by Google
+        // and not yet checked with a live key.
+        spec(
+            "gemini",
+            Kind::Chat,
+            "https://generativelanguage.googleapis.com/v1beta/openai",
+            Some("GEMINI_API_KEY"),
+        ),
+        spec(
+            "deepseek",
+            Kind::Chat,
+            "https://api.deepseek.com",
+            Some("DEEPSEEK_API_KEY"),
+        ),
+        // The Anthropic adapter adds /v1/messages itself, so the base stops at /anthropic.
+        spec(
+            "minimax",
+            Kind::Anthropic,
+            "https://api.minimax.io/anthropic",
+            Some("MINIMAX_API_KEY"),
+        ),
+        spec(
+            "zai",
+            Kind::Chat,
+            "https://api.z.ai/api/paas/v4",
+            Some("ZHIPU_API_KEY"),
+        ),
+        spec(
+            "kimi",
+            Kind::Chat,
+            "https://api.moonshot.ai/v1",
+            Some("MOONSHOT_API_KEY"),
+        ),
     ]
 }
 

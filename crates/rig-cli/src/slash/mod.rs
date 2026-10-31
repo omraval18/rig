@@ -89,6 +89,7 @@ impl Tui {
             PickKind::Fork => self.fork_at(item.value.parse().unwrap_or(0)),
             PickKind::Provider => self.pick_provider(&item.value),
             PickKind::Profile => self.cmd_profile(&item.value),
+            PickKind::ProviderKind => self.provider_kind_picked(&item.value),
             PickKind::Settings => self.pick_setting(&item.value),
             PickKind::Skills => {
                 self.prompt
