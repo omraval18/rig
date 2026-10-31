@@ -27,6 +27,7 @@ pub enum Cmd {
     Summary,
     Loop,
     Mcp,
+    RefreshModels,
     Reasoning,
     Settings,
     Version,
@@ -188,6 +189,14 @@ pub static COMMANDS: &[Spec] = &[
             true,
         )
     },
+    spec(
+        Cmd::RefreshModels,
+        "refresh-models",
+        "/refresh-models",
+        "download the latest providers and models (and their prices)",
+        Category::Account,
+        false,
+    ),
     spec(
         Cmd::Mcp,
         "mcp",

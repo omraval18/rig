@@ -1,6 +1,7 @@
 //! The text box over the composer: typing an API key, or naming a new profile.
 
 use super::Tui;
+use crate::catalog;
 use crate::entry::{Entry, Purpose};
 use crate::picker::{PickItem, PickKind};
 use crate::profile;
@@ -68,6 +69,87 @@ impl Tui {
         });
     }
 
+    pub(crate) fn open_catalog_search(&mut self) {
+        self.open_entry(Entry {
+            purpose: Purpose::CatalogSearch,
+            title: "Search models.dev".into(),
+            hint: "a provider or model name, such as 'deepseek flash' or 'kimi'".into(),
+            value: String::new(),
+            secret: false,
+        });
+    }
+
+    /// The search results: each row's value is `provider`, a tab, then `model`.
+    fn catalog_search_given(&mut self, query: &str) -> Result<(), String> {
+        let cat = catalog::ensure(&self.app.paths.base)?;
+        let hits = catalog::search(&cat, query);
+        if hits.is_empty() {
+            return Err(format!("no model matches '{query}'; try fewer words"));
+        }
+        let items = hits
+            .iter()
+            .map(|h| {
+                let price = h
+                    .cost
+                    .and_then(|c| Some(format!("${}/${} per M tokens", c.input?, c.output?)))
+                    .unwrap_or_else(|| "price unknown".into());
+                PickItem::new(
+                    format!("{}  ({})", h.name, h.provider),
+                    format!("{}\t{}", h.provider, h.model),
+                )
+                .detail(price)
+            })
+            .collect();
+        self.open_picker(
+            PickKind::CatalogMatch,
+            "Models on models.dev · Enter picks one",
+            items,
+        );
+        Ok(())
+    }
+
+    /// A catalog model was picked: ask only for its key.
+    pub(crate) fn catalog_match_picked(&mut self, value: &str) {
+        let Some((provider, model)) = value.split_once('\t') else {
+            return;
+        };
+        let result = (|| -> Result<(), String> {
+            let cat = catalog::ensure(&self.app.paths.base)?;
+            let p = cat
+                .providers
+                .get(provider)
+                .ok_or("that provider is no longer listed")?;
+            let npm = p.npm.as_deref().unwrap_or("");
+            let kind = catalog::kind_for(npm)
+                .ok_or_else(|| format!("{provider} uses an API style rig does not speak yet"))?;
+            let url =
+                catalog::base_url(p, kind).ok_or("the catalog has no URL for this provider")?;
+            if self.app.cfg.providers.contains_key(provider) {
+                return Err(format!(
+                    "'{provider}' is already a provider; pick it from /provider"
+                ));
+            }
+            profile::validate(provider)?;
+            self.open_entry(Entry {
+                purpose: Purpose::ProviderKey {
+                    name: provider.into(),
+                    kind: kind.into(),
+                    url,
+                    model: Some(model.into()),
+                    catalog: Some(provider.into()),
+                },
+                title: format!("API key for {provider} ({model})"),
+                hint: "stored in keys.json, only you can read it".into(),
+                value: String::new(),
+                secret: true,
+            });
+            Ok(())
+        })();
+        if let Err(e) = result {
+            self.error(&e);
+        }
+    }
+
     fn open_entry(&mut self, entry: Entry) {
         self.prompt.completion = None;
         self.prompt.picker = None;
@@ -111,15 +193,26 @@ impl Tui {
             Purpose::NewProfile => self.create_profile(&value),
             Purpose::ProviderName => self.provider_name_given(&value),
             Purpose::ProviderUrl { name, kind } => self.provider_url_given(name, kind, &value),
-            Purpose::ProviderKey { name, kind, url } => {
-                self.provider_key_given(name, kind, url, &value)
-            }
+            Purpose::ProviderKey {
+                name,
+                kind,
+                url,
+                model,
+                catalog,
+            } => match model {
+                // Picked from models.dev: the model is already known, so the key saves it.
+                Some(model) => {
+                    self.save_provider(name, kind, url, &value, model, catalog.as_deref())
+                }
+                None => self.provider_key_given(name, kind, url, &value),
+            },
             Purpose::ProviderModel {
                 name,
                 kind,
                 url,
                 key,
-            } => self.save_provider(name, kind, url, key, &value),
+            } => self.save_provider(name, kind, url, key, &value, None),
+            Purpose::CatalogSearch => self.catalog_search_given(&value),
         };
         if let Err(e) = result {
             self.error(&e);
@@ -155,6 +248,7 @@ impl Tui {
         url: &str,
         key: &str,
         model: &str,
+        catalog_id: Option<&str>,
     ) -> Result<(), String> {
         profile::validate(name)?;
         let spec = ProviderSpec {
@@ -171,6 +265,7 @@ impl Tui {
             keyless: key.is_empty(),
             web_search: false,
             default_model: Some(model.into()),
+            catalog_id: catalog_id.map(String::from),
         };
         crate::providers::save(&self.app.paths.providers_file(), &spec)?;
         self.app.cfg.providers.insert(name.into(), spec);
@@ -214,6 +309,8 @@ impl Tui {
                 name: name.into(),
                 kind: kind.into(),
                 url: url.into(),
+                model: None,
+                catalog: None,
             },
             title: format!("API key for {name}"),
             hint:

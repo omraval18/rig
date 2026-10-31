@@ -16,7 +16,14 @@ impl Tui {
             self.stats.plan_turns += 1;
             return;
         }
-        match rig_core::pricing::lookup(&self.info.spec.name, &self.info.model) {
+        let built_in = rig_core::pricing::lookup(&self.info.spec.name, &self.info.model);
+        // Providers added from models.dev carry their catalog id, which prices their models.
+        let from_catalog = || {
+            let id = self.info.spec.catalog_id.as_deref()?;
+            let cat = crate::catalog::load(&self.app.paths.base)?;
+            crate::catalog::price(&cat, id, &self.info.model)
+        };
+        match built_in.or_else(from_catalog) {
             Some(price) => self.stats.cost += price.cost(&u),
             None => self.stats.unpriced_turns += 1,
         }

@@ -15,11 +15,17 @@ pub enum Purpose {
         name: String,
         kind: String,
     },
+    /// A model picked from models.dev: the key is the last step, and the rest is already known.
     ProviderKey {
         name: String,
         kind: String,
         url: String,
+        /// Set when the provider came from the catalog: its model and its catalog id.
+        model: Option<String>,
+        catalog: Option<String>,
     },
+    /// A few words to search models.dev for.
+    CatalogSearch,
     ProviderModel {
         name: String,
         kind: String,

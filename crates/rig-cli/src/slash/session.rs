@@ -190,6 +190,24 @@ impl Tui {
         self.launch(Job::Compact);
     }
 
+    /// `/refresh-models`: download the catalog in the background; the result is reported when it lands.
+    pub(super) fn cmd_refresh_models(&mut self) {
+        self.say("Downloading the latest model list from models.dev…");
+        let base = self.app.paths.base.clone();
+        let tx = self.tx.clone();
+        std::thread::spawn(move || {
+            let msg = match crate::catalog::refresh(&base) {
+                Ok(c) => format!(
+                    "Model list updated: {} providers, {} models.",
+                    c.providers.len(),
+                    c.providers.values().map(|p| p.models.len()).sum::<usize>()
+                ),
+                Err(e) => e,
+            };
+            let _ = tx.send(crate::runtime::Ev::Notice(msg));
+        });
+    }
+
     /// `/mcp`: the configured servers and their state. Servers start when the model first uses them.
     pub(super) fn cmd_mcp(&mut self) {
         let lines = self.app.mcp.status();

@@ -42,6 +42,7 @@ mod tests {
             keyless: false,
             web_search: false,
             default_model: Some("big-model".into()),
+            catalog_id: None,
         };
         save(&path, &spec).unwrap();
         let back = load(&path);

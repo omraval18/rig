@@ -12,6 +12,7 @@ pub enum PickKind {
     Provider,
     Profile,
     ProviderKind,
+    CatalogMatch,
     Skills,
     Settings,
 }
