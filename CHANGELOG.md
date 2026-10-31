@@ -4,6 +4,10 @@ All notable changes to rig are recorded here. The format follows [Keep a Changel
 
 ## [Unreleased]
 
+### Changed
+
+- `install.sh` installs the latest release for your Mac, checked against `SHA256SUMS`, so Rust is no longer needed. It builds from source only when no release exists for your machine or `RIG_FROM_SOURCE=1` is set.
+
 ## [0.3.0] - 2026-10-31
 
 ### Added
