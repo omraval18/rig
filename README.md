@@ -112,6 +112,8 @@ The footer reads `model · effort <level> · permissions <level>`: reasoning eff
 
 `auto` is accepted for `low` and `full-access` for `high`; `ask` asks before every edit or command. Anything above the level is an approval prompt in the UI (yes / no / always; "always" rules persist in the profile's `allowlist.json`) and a denial in `rig ask`. The model declares a `risk` for every command, but it is only a claim: `risk_floor` raises it for pushes, deletions, `sudo`, `curl | sh`, and similar.
 
+**`rigd` is full access.** It is the same binary under another name: `rigd` starts every run at `high`, so nothing asks for approval, including `rm`, pushes and `curl | sh`. Use it only in a checkout or container you don't mind the agent changing. `rig --auto <level>` still picks a level for `rig`.
+
 ### Profiles
 
 A profile is a separate set of logins, API keys and settings: a work and a personal ChatGPT account, two Anthropic keys, different default models.

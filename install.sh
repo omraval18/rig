@@ -48,11 +48,13 @@ BIN="$DEST/rig"
 rm -f "$BIN"
 cp "$SRC/target/release/rig" "$BIN"
 chmod 755 "$BIN"
+# rigd is the same binary; running it under that name means full access.
+ln -sf rig "$DEST/rigd"
 if [ "$(uname -s)" = "Darwin" ] && command -v codesign >/dev/null 2>&1; then
   codesign --force --sign - "$BIN" >/dev/null 2>&1 || true
 fi
 
-say "Installed $("$BIN" --version) to $BIN"
+say "Installed $("$BIN" --version) to $BIN, and rigd (full access) next to it"
 case ":$PATH:" in
   *":$DEST:"*) ;;
   *) say "Add it to your PATH:  export PATH=\"$DEST:\$PATH\"" ;;

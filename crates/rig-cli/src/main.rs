@@ -123,8 +123,18 @@ pub enum KeyCmd {
     List,
 }
 
+/// The permission level a run starts with when no `--auto` is given. `rigd` (a link to this same
+/// binary) starts with full access, so it never asks before running anything.
+fn default_autonomy(argv0: Option<&std::ffi::OsStr>) -> Option<&'static str> {
+    let name = std::path::Path::new(argv0?).file_name()?;
+    (name == "rigd").then_some("high")
+}
+
 fn main() {
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
+    if cli.opts.auto.is_none() {
+        cli.opts.auto = default_autonomy(std::env::args_os().next().as_deref()).map(String::from);
+    }
     // Profile management must work even when the profile in use is broken or missing.
     if let Some(Cmd::Profile(cmd)) = &cli.cmd {
         std::process::exit(subcommands::profile(cmd, cli.opts.profile.as_deref()));

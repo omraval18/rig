@@ -26,3 +26,16 @@ fn subcommands_and_a_first_message_coexist() {
         ["fix", "the", "tests"]
     );
 }
+
+#[test]
+fn rigd_is_full_access_and_rig_keeps_the_default() {
+    use std::ffi::OsStr;
+    assert_eq!(default_autonomy(Some(OsStr::new("rigd"))), Some("high"));
+    assert_eq!(
+        default_autonomy(Some(OsStr::new("/home/me/.local/bin/rigd"))),
+        Some("high")
+    );
+    assert_eq!(default_autonomy(Some(OsStr::new("rig"))), None);
+    assert_eq!(default_autonomy(Some(OsStr::new("/usr/bin/rig"))), None);
+    assert_eq!(default_autonomy(None), None);
+}
