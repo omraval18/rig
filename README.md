@@ -1,26 +1,45 @@
 # rig
 
-A small, fast coding-agent harness for the terminal, written in Rust. One static binary, no runtime, no async executor.
+**A small, fast coding agent for your terminal.** One static Rust binary, no runtime, no async executor. Point it at a project and it reads the code, makes the smallest change that works, runs the checks, and reports back.
 
-A stateless agent loop, a risk-gated `run_command`, autonomy levels and harness-injected `<rig-context>` blocks, with a prompt and tool set written to keep the model on task: look, change minimally, verify, report.
+- **Stays on task.** Its prompt and tools are built around one loop: look, change minimally, verify, report.
+- **Safe by default.** Four autonomy levels, from *ask before every edit* to *full access*. Commands are risk-gated: risky ones such as pushes and deletions need approval unless your level allows them, and every approval is shown in the UI.
+- **Any model you have.** Your ChatGPT subscription, Anthropic, OpenAI, xAI, OpenRouter, Ollama, or any OpenAI-compatible server.
+- **Profiles.** Keep a work and a personal account, or two API keys, side by side. Each profile has its own logins, keys and settings.
+- **Local and inspectable.** Sessions are plain JSON Lines files on your disk. Network use is the model provider you chose, sign-in, and any web pages the agent fetches.
 
 | | rig 0.1.0 |
 |---|---|
-| Binary | ~3.1 MiB |
+| Binary | ~3.2 MiB |
 | Startup | ~1.5 ms over bare process spawn |
 | Memory | ~12 MB peak for a real request |
 
-## Install and sign in
+## Install
 
 ```bash
-cargo build --release          # -> target/release/rig
+curl -fsSL https://raw.githubusercontent.com/omraval18/rig/main/install.sh | sh
+```
+
+This builds rig from source with Cargo and installs `rig` to `~/.local/bin`. You need Rust, from [rustup.rs](https://rustup.rs). To read the script before running it:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/omraval18/rig/main/install.sh -o install.sh
+less install.sh && sh install.sh
+```
+
+From a checkout, `./install.sh` builds that checkout instead. Set `RIG_INSTALL_DIR` to install somewhere else.
+
+## Sign in
+
+```bash
 rig login codex                # ChatGPT subscription (browser sign-in)
-# or use an API key:
-rig key set anthropic          # save a key in the active profile (input hidden)
+rig key set anthropic          # or an API key, saved in the active profile (input hidden)
 export ANTHROPIC_API_KEY=...   # or use the environment: also OPENAI_API_KEY, XAI_API_KEY, OPENROUTER_API_KEY
 rig models                     # providers, default models, credential status
-rig doctor
+rig doctor                     # check the setup
 ```
+
+Inside rig, `/provider` lists the providers. Choosing one that has no key opens a masked box for it.
 
 ## Use
 
