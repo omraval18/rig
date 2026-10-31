@@ -6,11 +6,16 @@ All notable changes to rig are recorded here. The format follows [Keep a Changel
 
 ### Added
 
+- `ask_user`: the agent can ask a question with up to six options. The panel always ends with "Type something…", so you can give an answer of your own. Number keys pick an option; Esc skips the question; Ctrl-C skips it and stops nothing else.
+- `/summary`: a short account of the session (goal, what was done, files changed, open items), shown without changing the history.
 - `rig update`: checks the latest release and downloads it. `--check` only reports, `--off` and `--on` control automatic checks, and `--rollback` returns to the previous version.
 - Automatic updates: at most once every 20 hours rig checks GitHub in the background. A newer release is downloaded, its signature and checksum are verified, it runs and reports the right version, and only then is it staged. The next start swaps it in and keeps the old binary as `rig.prev`. The footer says when an update is ready.
 - Signed releases: `SHA256SUMS` is signed with minisign and the signature is checked before anything is staged.
 - CI on pull requests (format, clippy and tests on Linux and macOS) and a release workflow with pinned actions, a tag-to-version check, and a signature check before publishing. See `RELEASING.md`.
 
+### Changed
+
+- Messages typed while the agent is working are now called the queue ("Enter to queue"), and go in before its next step, as before.
 
 ## [0.1.0] - 2026-10-31
 

@@ -1,7 +1,7 @@
 //! The interactive terminal app: event loop, keys, completion, and the turn lifecycle.
 //!
 //! One thread owns the terminal. The agent runs on a worker (`runtime`), so the prompt
-//! stays live during a turn: Enter steers, Esc interrupts, approvals appear in place.
+//! stays live during a turn: Enter queues, Esc interrupts, approvals appear in place.
 
 use crate::app::{App, RunOpts, Started};
 use crate::complete::Completion;
@@ -39,6 +39,7 @@ mod format;
 mod keys;
 mod output;
 mod provider;
+mod question;
 mod recap;
 mod state;
 mod submit;
@@ -58,7 +59,7 @@ pub struct Tui {
     pub agent: Option<Box<Agent>>,
     pub tx: Sender<Ev>,
     rx: Receiver<Ev>,
-    pub steer: Arc<Mutex<VecDeque<Message>>>,
+    pub queue: Arc<Mutex<VecDeque<Message>>>,
     pub session: Arc<Mutex<Session>>,
     pub shared: Arc<Shared>,
     pub policy: Policy,
@@ -232,7 +233,7 @@ impl Tui {
             agent: Some(Box::new(agent)),
             tx,
             rx,
-            steer: Arc::default(),
+            queue: Arc::default(),
             session: Arc::new(Mutex::new(s.session)),
             shared,
             policy,

@@ -64,7 +64,12 @@ impl Agent {
             Some(tool) => {
                 let access = tool.access(&args);
                 let desc = tool.describe(&args);
-                let blocked = self.gate(&name, &desc, &access, ui);
+                let blocked = match &access {
+                    Access::Ask { question, options } => {
+                        Some(ask_output(ui.ask(question, options)))
+                    }
+                    _ => self.gate(&name, &desc, &access, ui),
+                };
                 (access.is_concurrent(), blocked)
             }
         };
@@ -147,6 +152,16 @@ impl Agent {
                 ))),
             },
         }
+    }
+}
+
+/// What the model is told after a question. An answer is returned as the tool result.
+fn ask_output(answer: Option<String>) -> ToolOutput {
+    match answer {
+        Some(a) => ToolOutput::ok(format!("The user answered: {a}")),
+        None => ToolOutput::err(
+            "No answer: the user did not reply, or nobody is available to ask. Decide for yourself and say which assumption you made.",
+        ),
     }
 }
 

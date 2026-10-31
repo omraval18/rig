@@ -22,6 +22,8 @@ mod notes;
 
 pub use archive::{lookup, search};
 
+pub mod summary;
+
 use archive::{Record, known_ids, next_ids, records};
 use notes::{clip, exact_sections, lint, strip_checkpoint, transcript};
 

@@ -29,6 +29,7 @@ fn view<'a>(c: &'a Composer, comp: Option<&'a Completion>, w: usize) -> View<'a>
         completion: comp,
         picker: None,
         entry: None,
+        question: None,
         approval: None,
         partial: "",
         activity: None,

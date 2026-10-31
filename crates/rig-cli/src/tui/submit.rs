@@ -1,4 +1,4 @@
-//! Turning the prompt into a message and starting a turn (or steering the running one).
+//! Turning the prompt into a message and starting a turn (or queued the running one).
 
 use super::{Part, Tui};
 use crate::runtime::Job;
@@ -74,7 +74,7 @@ impl Tui {
         if self.turn.running.is_some() || self.turn.compacting {
             self.echo_user(&text);
             let msg = self.compose(&text);
-            self.steer.locked().push_back(msg);
+            self.queue.locked().push_back(msg);
             self.say("  ↳ queued; the agent will see it at its next step");
         } else if self.agent.is_some() {
             self.echo_user(&text);

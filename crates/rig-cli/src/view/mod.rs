@@ -8,12 +8,14 @@ use crate::complete::Completion;
 use crate::composer::Composer;
 use crate::entry::Entry;
 use crate::picker::Picker;
+use crate::question::Question;
 
 mod approval;
 mod entry;
 mod footer;
 mod picker;
 mod prompt;
+mod question;
 mod text;
 
 use footer::footer_line;
@@ -40,6 +42,7 @@ pub struct View<'a> {
     pub completion: Option<&'a Completion>,
     pub picker: Option<&'a Picker>,
     pub entry: Option<&'a Entry>,
+    pub question: Option<&'a Question>,
     pub approval: Option<&'a ApprovalView>,
     /// Unfinished line of assistant text, shown live until its newline arrives.
     pub partial: &'a str,
@@ -68,6 +71,8 @@ pub fn render(v: &View) -> Frame {
     // Each panel reports its cursor relative to its own first row.
     let (panel, (row, col)) = if let Some(a) = v.approval {
         approval::rows(a, w, v.color)
+    } else if let Some(q) = v.question {
+        question::rows(q, w, v.color)
     } else if let Some(p) = v.picker {
         picker::rows(p, w, v.color)
     } else if let Some(e) = v.entry {
@@ -79,7 +84,7 @@ pub fn render(v: &View) -> Frame {
     lines.extend(panel);
 
     // Panels that replace the composer are closed by a rule; the composer's own rule comes first.
-    if v.approval.is_some() || v.picker.is_some() || v.entry.is_some() {
+    if v.approval.is_some() || v.question.is_some() || v.picker.is_some() || v.entry.is_some() {
         lines.push(rule(w, v.color));
     }
     lines.push(footer_line(&v.footer_left, &v.footer_right, w, v.color));

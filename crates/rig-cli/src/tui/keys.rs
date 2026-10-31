@@ -21,6 +21,9 @@ impl Tui {
         if self.prompt.approval.is_some() {
             return self.on_key_approval(k);
         }
+        if self.prompt.question.is_some() {
+            return self.on_key_question(k);
+        }
         if self.prompt.entry.is_some() {
             return self.on_key_entry(k);
         }
@@ -140,6 +143,11 @@ impl Tui {
     pub(super) fn on_ctrl_c(&mut self) {
         // Ctrl-C first backs out of a text box, so it never closes rig by accident.
         if self.prompt.entry.take().is_some() {
+            return;
+        }
+        // Ctrl-C also declines a question, so the agent carries on without an answer.
+        if let Some(pending) = self.prompt.question.take() {
+            let _ = pending.reply.send(None);
             return;
         }
         if self.prompt.approval.is_some() || self.turn.running.is_some() || self.turn.compacting {

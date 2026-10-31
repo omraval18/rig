@@ -84,6 +84,8 @@ pub struct Prompt {
     pub picker: Option<Picker>,
     /// The text box for an API key or a profile name, over the composer.
     pub entry: Option<crate::entry::Entry>,
+    /// A question from the agent, over the composer.
+    pub question: Option<super::question::PendingQuestion>,
     pub approval: Option<PendingApproval>,
     pub attachments: Vec<crate::attach::Attachment>,
     pub next_image: usize,
@@ -97,6 +99,7 @@ impl Prompt {
             suppress_completion: None,
             picker: None,
             entry: None,
+            question: None,
             approval: None,
             attachments: Vec::new(),
             next_image: 1,
