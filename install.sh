@@ -93,7 +93,7 @@ install_from_source() {
     || die "Rust is needed to build rig from source. Install it from https://rustup.rs, then run this again."
   command -v git >/dev/null 2>&1 || die "git is needed to fetch rig."
   SRC=""
-  if [ -f "$(dirname "$0")/Cargo.toml" ] && grep -q 'crates/rig-cli' "$(dirname "$0")/Cargo.toml" 2>/dev/null; then
+  if in_checkout; then
     SRC="$(cd "$(dirname "$0")" && pwd)"
   fi
   TMP=""
@@ -109,7 +109,10 @@ install_from_source() {
   [ -z "$TMP" ] || rm -rf "$TMP"
 }
 
-if [ "${RIG_FROM_SOURCE:-0}" = "1" ] || [ -f "$(dirname "$0")/crates/rig-cli/Cargo.toml" ]; then
+# Piped through `sh`, $0 is not a file, so the current folder is not a checkout.
+in_checkout() { [ -f "$0" ] && [ -f "$(dirname "$0")/crates/rig-cli/Cargo.toml" ]; }
+
+if [ "${RIG_FROM_SOURCE:-0}" = "1" ] || in_checkout; then
   install_from_source
 elif ! install_release; then
   say "No release is available for this machine; building from source instead."
