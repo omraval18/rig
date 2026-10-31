@@ -52,9 +52,9 @@ impl Responses {
         });
         if self.web_search {
             // The provider runs the search itself; its results come back inside the reply.
-            body["tools"]
-                .as_array_mut()
-                .map(|tools| tools.push(json!({"type": "web_search"})));
+            if let Some(tools) = body["tools"].as_array_mut() {
+                tools.push(json!({"type": "web_search"}));
+            }
         }
         if let Some(e) = req.effort {
             body["reasoning"] = json!({"effort": e.as_str(), "summary": "auto"});
