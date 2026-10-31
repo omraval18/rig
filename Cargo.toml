@@ -1,0 +1,60 @@
+[workspace]
+resolver = "2"
+members = ["crates/rig-core", "crates/rig-tools", "crates/rig-provider", "crates/rig-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+rust-version = "1.85"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rig-core = { path = "crates/rig-core" }
+rig-tools = { path = "crates/rig-tools" }
+rig-provider = { path = "crates/rig-provider" }
+
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# Size first, but keep the hot paths fast: searching (`search_text`, `@` index), TLS and JSON.
+[profile.release.package.regex-automata]
+opt-level = 3
+[profile.release.package.memchr]
+opt-level = 3
+[profile.release.package.aho-corasick]
+opt-level = 3
+[profile.release.package.ring]
+opt-level = 3
+[profile.release.package.serde_json]
+opt-level = 3
+
+[workspace.lints.clippy]
+expect_used = "deny"
+unwrap_used = "deny"
+manual_ok_or = "deny"
+manual_unwrap_or = "deny"
+manual_map = "deny"
+manual_filter = "deny"
+manual_find = "deny"
+manual_flatten = "deny"
+manual_strip = "deny"
+manual_retain = "deny"
+manual_range_contains = "deny"
+needless_borrow = "deny"
+needless_collect = "deny"
+needless_late_init = "deny"
+needless_question_mark = "deny"
+redundant_clone = "deny"
+redundant_closure = "deny"
+redundant_closure_for_method_calls = "deny"
+trivially_copy_pass_by_ref = "deny"
+uninlined_format_args = "deny"
+unnecessary_filter_map = "deny"
+unnecessary_lazy_evaluations = "deny"
+unnecessary_to_owned = "deny"

@@ -1,0 +1,23 @@
+[package]
+name = "rig-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "rig"
+path = "src/main.rs"
+
+[dependencies]
+rig-core.workspace = true
+rig-tools.workspace = true
+rig-provider.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+clap = { version = "4", default-features = false, features = ["std", "derive", "help", "usage", "error-context"] }
+toml = "0.8"
+crossterm = { version = "0.29", default-features = false, features = ["events", "bracketed-paste"] }
+unicode-width = "0.2"
+
+[lints]
+workspace = true
