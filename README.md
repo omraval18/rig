@@ -92,6 +92,10 @@ env = { NOTES_DIR = "/path/to/notes" }
 
 rig does not start a server until the model first searches for a tool, so unused servers cost nothing. The model sees only the server names. It finds tools with `mcp_search` and runs them with `mcp_call`, so the tool list stays the same size however many tools the servers have. A tool that the server marks read-only runs without asking. Any other call follows your approval level: `read-only` refuses it, `ask`, `low` and `medium` ask, and `high` runs it. `/mcp` shows each server and whether it is running.
 
+### Cost
+
+`/stats` shows the session's estimated cost from list prices. Cached prompt tokens and prompt tokens written to the cache are billed at their own rates, as the providers bill them. The prices come from models.dev and are built into the binary, so they can be a little out of date; `scripts/gen_prices.py` refreshes them. ChatGPT plan turns are not billed per token, and models without a known price are counted separately rather than guessed.
+
 ### Loops
 
 `/loop <objective>` (or `/goal`) works toward one objective across several turns. After each turn, rig starts another round unless the model has reported the goal complete (through `update_goal`) or blocked (after asking you with `ask_user`). It stops after 10 rounds, when you press Ctrl-C, or when you interrupt a round. The footer shows `goal N/10` while a loop runs; `/loop` shows the goal and `/loop stop` drops it.

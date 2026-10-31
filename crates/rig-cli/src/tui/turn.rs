@@ -10,6 +10,18 @@ use rig_core::sync::MutexExt;
 use std::time::Instant;
 
 impl Tui {
+    /// Add a finished turn's cost, from the list price of the model that served it.
+    fn account_cost(&mut self, u: Usage) {
+        if self.info.spec.chatgpt_plan {
+            self.stats.plan_turns += 1;
+            return;
+        }
+        match rig_core::pricing::lookup(&self.info.spec.name, &self.info.model) {
+            Some(price) => self.stats.cost += price.cost(&u),
+            None => self.stats.unpriced_turns += 1,
+        }
+    }
+
     pub(super) fn finish_job(
         &mut self,
         mut agent: Box<Agent>,
@@ -75,6 +87,7 @@ impl Tui {
         if u.output > 0 {
             self.stats.turns += 1;
             self.stats.total += u;
+            self.account_cost(u);
             let cached = if u.cached > 0 {
                 format!(" · {} cached", fmt_tokens(u.cached))
             } else {

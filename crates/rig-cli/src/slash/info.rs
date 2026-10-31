@@ -12,9 +12,25 @@ impl Tui {
         let ctx = self.info.ctx_pct.map_or("unknown".into(), |p| {
             format!("{p}% of {}", fmt_tokens(self.info.context_window))
         });
+        let s = &self.stats;
+        let cost = if s.plan_turns > 0 && s.cost == 0.0 && s.unpriced_turns == 0 {
+            "included in your ChatGPT plan".to_string()
+        } else {
+            let mut c = format!("≈ ${:.4} (list prices)", s.cost);
+            if s.unpriced_turns > 0 {
+                c.push_str(&format!(", {} turn(s) without a price", s.unpriced_turns));
+            }
+            if s.plan_turns > 0 {
+                c.push_str(&format!(
+                    ", {} ChatGPT plan turn(s) not counted",
+                    s.plan_turns
+                ));
+            }
+            c
+        };
         self.say(&format!(
-            "turns {} · {} in · {} out · {} cached\ncontext {ctx} · session {id}",
-            self.stats.turns,
+            "turns {} · {} in · {} out · {} cached\ncost {cost}\ncontext {ctx} · session {id}",
+            s.turns,
             fmt_tokens(t.input),
             fmt_tokens(t.output),
             fmt_tokens(t.cached)
