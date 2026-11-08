@@ -243,3 +243,7 @@ Known unverified: the browser sign-in has not been run end to end (OpenAI's auth
 ## Development
 
 See [AGENTS.md](AGENTS.md) for the code conventions. `just check` runs format, clippy and the tests.
+
+## License
+
+rig is licensed under the [MIT License](LICENSE). You may use, modify, and distribute it, including commercially, provided you retain the copyright and license notice.
