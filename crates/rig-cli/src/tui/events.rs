@@ -10,6 +10,11 @@ impl Tui {
             while let Ok(ev) = self.rx.try_recv() {
                 self.on_ev(ev);
             }
+            if let Some(selection) = &mut self.display.selection
+                && selection.tick(&mut self.display.transcript, self.display.viewport)
+            {
+                self.dirty = true;
+            }
             if (self.turn.running.is_some() || self.turn.compacting)
                 && self.display.last_tick.elapsed() >= Duration::from_millis(100)
             {
@@ -56,8 +61,49 @@ impl Tui {
                     }
                     Ok(Event::Resize(..)) => self.dirty = true,
                     Ok(Event::Mouse(m)) => {
-                        let rows = self.display.height.saturating_sub(4);
+                        let rows = self.display.viewport;
                         match m.kind {
+                            event::MouseEventKind::Down(event::MouseButton::Left) => {
+                                self.display.selection = super::selection::Selection::start(
+                                    &self.display.transcript,
+                                    rows,
+                                    m.row as usize,
+                                    m.column as usize,
+                                );
+                            }
+                            event::MouseEventKind::Drag(event::MouseButton::Left) => {
+                                if let Some(selection) = &mut self.display.selection {
+                                    selection.drag(
+                                        &self.display.transcript,
+                                        rows,
+                                        m.row as usize,
+                                        m.column as usize,
+                                    );
+                                }
+                            }
+                            event::MouseEventKind::Up(event::MouseButton::Left) => {
+                                if let Some(selection) = &mut self.display.selection {
+                                    selection.drag(
+                                        &self.display.transcript,
+                                        rows,
+                                        m.row as usize,
+                                        m.column as usize,
+                                    );
+                                    if selection.finish() {
+                                        let text = selection.text(&self.display.transcript);
+                                        if !text.is_empty() {
+                                            match crate::desktop::copy_text(&text) {
+                                                Ok(_) => self.notice("selection copied"),
+                                                Err(e) => self.notice(format!(
+                                                    "could not copy selection: {e}"
+                                                )),
+                                            }
+                                        }
+                                    } else {
+                                        self.display.selection = None;
+                                    }
+                                }
+                            }
                             event::MouseEventKind::ScrollUp => {
                                 self.display.transcript.scroll_by(3, rows)
                             }
