@@ -107,6 +107,17 @@ impl Transcript {
         self.scroll = (self.scroll as isize + delta).clamp(0, max as isize) as usize;
     }
 
+    /// Translate a viewport row to a transcript row, ignoring padded blank space.
+    pub fn row_at(&self, height: usize, row: usize) -> Option<usize> {
+        let end = self.rows.len().saturating_sub(self.scroll);
+        let index = end.saturating_sub(height).saturating_add(row);
+        (row < height && index < end).then_some(index)
+    }
+
+    pub fn row(&self, index: usize) -> Option<&str> {
+        self.rows.get(index).map(String::as_str)
+    }
+
     /// The rows to show in a viewport of `height`, top-aligned, padded with blanks.
     pub fn view(&mut self, height: usize) -> Vec<String> {
         let max = self.rows.len().saturating_sub(height);

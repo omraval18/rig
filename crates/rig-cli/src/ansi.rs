@@ -48,6 +48,56 @@ pub fn visible_width(s: &str) -> usize {
         .sum()
 }
 
+/// Extract screen columns without their terminal styling.
+pub fn columns(s: &str, start: usize, end: usize) -> String {
+    let mut out = String::new();
+    let mut col = 0;
+    let mut selected = false;
+    for p in pieces(s) {
+        if let Piece::Ch(c, width) = p {
+            if width > 0 {
+                selected = col < end && col + width > start;
+            }
+            if selected {
+                out.push(c);
+            }
+            col += width;
+        }
+    }
+    out
+}
+
+/// Highlight screen columns without losing the row's existing styles.
+pub fn highlight(s: &str, start: usize, end: usize) -> String {
+    let mut out = String::new();
+    let (mut col, mut selected) = (0, false);
+    for p in pieces(s) {
+        match p {
+            Piece::Esc(e) => {
+                out.push_str(&e);
+                if selected && e.ends_with('m') {
+                    out.push_str("\x1b[7m");
+                }
+            }
+            Piece::Ch(c, width) => {
+                if width > 0 {
+                    let next = col < end && col + width > start;
+                    if next != selected {
+                        out.push_str(if next { "\x1b[7m" } else { "\x1b[27m" });
+                        selected = next;
+                    }
+                }
+                out.push(c);
+                col += width;
+            }
+        }
+    }
+    if selected {
+        out.push_str("\x1b[27m");
+    }
+    out
+}
+
 /// Cut to at most `w` columns, closing any open style.
 pub fn clip(s: &str, w: usize) -> String {
     let mut out = String::with_capacity(s.len());

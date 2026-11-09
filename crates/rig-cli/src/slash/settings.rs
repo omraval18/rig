@@ -135,10 +135,9 @@ impl Tui {
                 "remember",
             ),
             row(
-                "Mouse wheel scrolling",
-                if self.app.state.mouse.unwrap_or(true) {
-                    "on · scroll the conversation; hold Shift (Option on macOS) to select text"
-                        .to_string()
+                "Mouse interaction",
+                if self.app.state.mouse_enabled() {
+                    "on · wheel scrolling and drag selection with edge scrolling".to_string()
                 } else {
                     "off · use PageUp/PageDown to scroll; select text freely".to_string()
                 },
@@ -202,7 +201,8 @@ impl Tui {
                 self.open_settings(Some("remember"));
             }
             "mouse" => {
-                let on = !self.app.state.mouse.unwrap_or(true);
+                let on = !self.app.state.mouse_enabled();
+                self.clear_selection();
                 self.app.state.mouse = Some(on);
                 self.app.save_state();
                 let _ = if on {

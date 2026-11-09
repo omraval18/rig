@@ -28,7 +28,7 @@ pub struct State {
     /// Start new chats with the model, effort and permissions you used last. On by default.
     #[serde(default = "yes")]
     pub remember: bool,
-    /// Mouse wheel scrolls the conversation (hold Shift/Option to select text). On by default.
+    /// Mouse interaction for scrolling and transcript selection. On by default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mouse: Option<bool>,
 }
@@ -48,6 +48,10 @@ impl Default for State {
 }
 
 impl State {
+    pub fn mouse_enabled(&self) -> bool {
+        self.mouse.unwrap_or(true)
+    }
+
     pub fn load(path: &Path) -> State {
         std::fs::read_to_string(path)
             .ok()
