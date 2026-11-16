@@ -80,3 +80,12 @@ fn clipping_closes_styles() {
     assert!(c.ends_with(RESET));
     assert_eq!(clip("short", 10), "short");
 }
+
+#[test]
+fn selection_uses_screen_columns_and_preserves_styling() {
+    let text = "a\x1b[31m日\x1b[0me\u{301}z";
+    assert_eq!(columns(text, 2, 4), "日e\u{301}");
+    let highlighted = highlight(text, 1, 4);
+    assert_eq!(plain(&highlighted), "a日e\u{301}z");
+    assert!(highlighted.contains("\x1b[0m\x1b[7m"));
+}

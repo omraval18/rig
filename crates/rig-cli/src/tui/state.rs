@@ -138,8 +138,11 @@ pub struct Display {
     pub color: bool,
     pub width: usize,
     pub height: usize,
+    /// Rows available to the conversation in the most recently drawn frame.
+    pub viewport: usize,
     /// The conversation as shown: wrapped to the window, scrollable, cleared by /new.
     pub transcript: Transcript,
+    pub(super) selection: Option<super::selection::Selection>,
     pub styler: Styler,
     pub last_part: Part,
     pub notice: Option<(String, Instant)>,
@@ -154,7 +157,9 @@ impl Display {
             color,
             width,
             height,
+            viewport: height.saturating_sub(4),
             transcript: Transcript::new(width, color),
+            selection: None,
             styler: Styler::new(color),
             last_part: Part::Banner,
             notice: None,

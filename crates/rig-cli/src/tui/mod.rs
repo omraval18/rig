@@ -42,6 +42,7 @@ mod output;
 mod provider;
 mod question;
 mod recap;
+mod selection;
 mod state;
 mod submit;
 #[cfg(test)]
@@ -88,13 +89,14 @@ struct RawGuard;
 
 impl RawGuard {
     /// Take over the whole window: the alternate screen (your shell is back untouched on exit),
-    /// raw keys, bracketed paste, and the mouse wheel for scrolling.
+    /// raw keys, bracketed paste, and optionally the mouse wheel for scrolling.
     fn enter(mouse: bool) -> std::io::Result<Self> {
         terminal::enable_raw_mode()?;
         crossterm::execute!(
             stdout(),
             terminal::EnterAlternateScreen,
-            event::EnableBracketedPaste
+            event::EnableBracketedPaste,
+            event::DisableMouseCapture
         )?;
         if mouse {
             crossterm::execute!(stdout(), event::EnableMouseCapture)?;
@@ -134,7 +136,7 @@ pub fn run(app: App, opts: RunOpts) -> i32 {
     };
     let resumed = opts.cont || opts.resume.is_some();
     let first_message = opts.first_message;
-    let guard = match RawGuard::enter(app.state.mouse.unwrap_or(true)) {
+    let guard = match RawGuard::enter(app.state.mouse_enabled()) {
         Ok(g) => g,
         Err(e) => {
             eprintln!("error: cannot use the terminal: {e}");
@@ -181,8 +183,13 @@ fn restart_in_profile(name: &str) -> i32 {
 }
 
 impl Tui {
+    pub fn clear_selection(&mut self) {
+        self.display.selection = None;
+    }
+
     /// Wipe the window down to a fresh header: the start of a new session, or one just resumed.
     pub fn reset_screen(&mut self) {
+        self.display.selection = None;
         self.display.transcript.clear();
         self.display.last_part = Part::Start;
         self.banner(false);

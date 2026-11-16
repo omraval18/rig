@@ -75,7 +75,8 @@ Commands: `/new` (`/clear`), `/resume`, `/fork`, `/rename`, `/compact`, `/model`
 
 rig takes over the whole terminal window (the alternate screen, like vim): the conversation fills the window, the prompt box is pinned to the bottom, and your shell is untouched when you quit. Only rows that changed are repainted, in one write, with the cursor hidden meanwhile, so resizing the window cannot leave stale or duplicated input boxes and the cursor never flickers around the screen. Text is wrapped at word boundaries (list items keep a hanging indent).
 
-- **Scroll:** mouse wheel, PageUp / PageDown; End jumps back to the latest. Hold Shift (Option on macOS) to select text with the mouse, or turn mouse capture off in `/settings`. `/copy` copies the last reply.
+- **Select and copy:** drag across the conversation to select text; hold the pointer at the top or bottom edge to keep scrolling while selecting. The selection is copied on release. `/copy` copies the last reply without selecting it.
+- **Scroll:** use the mouse wheel or PageUp / PageDown; End jumps back to the latest. Mouse interaction is on by default and can be disabled in `/settings` → **Mouse interaction** for native terminal selection. With it off, Up / Down also scroll (some terminals send these keys for the wheel); use Alt+Up / Alt+Down to navigate prompt lines and history. Existing saved mouse settings are preserved.
 - **`/new`, `/resume`, `/fork`** clear the window down to the new session's own messages.
 - **Per-session settings:** every session records the model, effort and permissions it uses. `rig -c`, `rig --resume <id>` and `/resume` bring that session's own setup back, whatever other sessions used since (flags still win). New chats use what you used last.
 

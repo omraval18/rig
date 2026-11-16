@@ -109,6 +109,7 @@ impl Tui {
                 (w as usize, h as usize)
             });
         if (w, h) != (self.display.width, self.display.height) {
+            self.display.selection = None;
             self.display.width = w;
             self.display.height = h;
             self.display.transcript.set_width(w);
@@ -123,8 +124,16 @@ impl Tui {
             cursor_row = cursor_row.saturating_sub(cut);
         }
         let viewport = h - lines.len();
+        self.display.viewport = viewport;
         let mut rows = self.display.transcript.view(viewport);
-        if self.display.transcript.scroll > 0 && viewport > 0 {
+        if let Some(selection) = &self.display.selection {
+            for (y, line) in rows.iter_mut().enumerate() {
+                if let Some(row) = self.display.transcript.row_at(viewport, y) {
+                    *line = selection.paint(row, line);
+                }
+            }
+        }
+        if self.display.transcript.scroll > 0 && viewport > 0 && self.display.selection.is_none() {
             let note = format!(
                 "↓ {} more rows below · End jumps to the latest",
                 self.display.transcript.scroll

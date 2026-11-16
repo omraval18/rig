@@ -30,8 +30,8 @@ impl Tui {
         if self.prompt.picker.is_some() {
             return self.on_key_picker(k);
         }
-        let page = self.display.height.saturating_sub(5).max(1) as isize;
-        let view_rows = self.display.height.saturating_sub(4);
+        let view_rows = self.display.viewport;
+        let page = view_rows.saturating_sub(1).max(1) as isize;
         match k.code {
             KeyCode::Char('d') if ctrl => {
                 if self.prompt.composer.is_empty() {
@@ -59,6 +59,19 @@ impl Tui {
             KeyCode::Enter if self.has_completion_choice() => self.accept_completion(true),
             KeyCode::Enter => self.submit(),
             KeyCode::Tab if self.has_completion_choice() => self.accept_completion(false),
+            KeyCode::Up | KeyCode::Down
+                if scroll_with_arrow(
+                    self.app.state.mouse_enabled(),
+                    k.modifiers,
+                    self.prompt
+                        .completion
+                        .as_ref()
+                        .is_some_and(|c| !c.items.is_empty()),
+                ) =>
+            {
+                let delta = if k.code == KeyCode::Up { 1 } else { -1 };
+                self.display.transcript.scroll_by(delta, view_rows);
+            }
             KeyCode::Up => self.move_up(),
             KeyCode::Down => self.move_down(),
             KeyCode::Char('n') if ctrl => {
@@ -235,6 +248,15 @@ impl Tui {
         self.prompt.picker = Some(Picker::new(kind, title, items));
         self.dirty = true;
     }
+}
+
+/// Without mouse capture, terminals may send arrow keys for the wheel on the alternate screen.
+pub(super) fn scroll_with_arrow(
+    mouse_enabled: bool,
+    mods: KeyModifiers,
+    has_completion: bool,
+) -> bool {
+    !mouse_enabled && mods == KeyModifiers::NONE && !has_completion
 }
 
 /// Cursor and text-editing keys. Each is a single `Composer` operation.
