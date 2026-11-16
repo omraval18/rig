@@ -94,7 +94,7 @@ rig does not start a server until the model first searches for a tool, so unused
 
 ### Providers
 
-`/provider` lists the built-in providers and "+ Add provider…", which asks for a name, the API style (OpenAI- or Anthropic-compatible), the base URL, the key and a model ID. Built-in presets include DeepSeek, MiniMax, Z.ai, Kimi and Gemini. Providers you add are saved in your profile, so you don't edit `config.toml`. Base URLs are the API root: rig adds `/chat/completions` or `/messages` itself.
+`/provider` lists the built-in providers and "+ Add provider…", which asks for a name, the API style (OpenAI- or Anthropic-compatible), the base URL, the key and a model ID. Built-in presets include DeepSeek, MiniMax, Z.ai, Kimi and Gemini, the coding plans of Z.ai, MiniMax and Kimi (`zai-coding-plan`, `minimax-coding-plan`, `kimi-coding-plan`), and OpenCode Zen and Go (`opencode`, `opencode-go`). With one OpenCode key you can use every model the gateway lists: rig sends each model to the API it needs (for example `/model opencode-go/minimax-m3` or `/model opencode/gpt-6-sol`). Providers you add are saved in your profile, so you don't edit `config.toml`. Base URLs are the API root: rig adds `/chat/completions` or `/messages` itself.
 
 Want a provider that isn't built in? `/provider` → **Search models.dev…** finds providers and models from the public catalog at models.dev. Pick a model and you're asked only for the key: the URL, API style, price and model come from the catalog. The copy is kept in your rig home and refreshed weekly, or with `/refresh-models`.
 

@@ -3,6 +3,8 @@
 //! a week, and on `/refresh-models`. Nothing from it is compiled into the binary.
 
 use rig_core::pricing::Price;
+use rig_core::provider::ModelInfo;
+use rig_provider::{Kind, Route};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -28,6 +30,11 @@ pub struct Model {
     pub name: String,
     pub cost: Option<Cost>,
     pub context: Option<u64>,
+    /// Set when a gateway serves this model from another API than the provider's own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub npm: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -67,6 +74,13 @@ struct RawModel {
     name: String,
     cost: Option<Cost>,
     limit: Option<RawLimit>,
+    provider: Option<RawModelProvider>,
+}
+
+#[derive(Deserialize)]
+struct RawModelProvider {
+    api: Option<String>,
+    npm: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -135,10 +149,13 @@ fn trim(raw: BTreeMap<String, RawProvider>, fetched_at: u64) -> Catalog {
                 .models
                 .into_iter()
                 .map(|(mid, m)| {
+                    let (api, npm) = m.provider.map_or((None, None), |o| (o.api, o.npm));
                     let model = Model {
                         name: m.name,
                         cost: m.cost,
                         context: m.limit.and_then(|l| l.context),
+                        api,
+                        npm,
                     };
                     (mid, model)
                 })
@@ -179,6 +196,58 @@ pub fn kind_for(npm: &str) -> Option<&'static str> {
         "@ai-sdk/openai" | "@ai-sdk/openai-compatible" => Some("chat"),
         _ => None,
     }
+}
+
+/// How a gateway serves one model, from the catalog: `None` when the catalog does not say (the
+/// provider's own routes then decide), an error when the model speaks an API rig cannot.
+pub fn model_route(c: &Catalog, provider: &str, model: &str) -> Option<Result<Route, String>> {
+    let p = c.providers.get(provider)?;
+    let m = p.models.get(model)?;
+    let npm = m.npm.as_deref().or(p.npm.as_deref())?;
+    let kind = match npm {
+        "@ai-sdk/anthropic" => Kind::Anthropic,
+        // Through a gateway, the OpenAI SDK means the Responses API.
+        "@ai-sdk/openai" => Kind::Responses,
+        "@ai-sdk/openai-compatible" | "@ai-sdk/mistral" => Kind::Chat,
+        other => {
+            return Some(Err(format!(
+                "{provider}/{model} needs an API rig does not speak yet ({other})"
+            )));
+        }
+    };
+    let api = m.api.as_deref().or(p.api.as_deref())?.trim_end_matches('/');
+    let base_url = if kind == Kind::Anthropic {
+        api.strip_suffix("/v1").unwrap_or(api)
+    } else {
+        api
+    };
+    Some(Ok(Route {
+        models: vec![model.to_string()],
+        kind,
+        base_url: base_url.to_string(),
+    }))
+}
+
+/// A provider's models from the catalog, leaving out those rig cannot reach, for gateways whose
+/// own model list does not say which API each model needs.
+pub fn models(c: &Catalog, provider: &str) -> Option<Vec<ModelInfo>> {
+    let p = c.providers.get(provider)?;
+    Some(
+        p.models
+            .iter()
+            .filter(|(id, _)| !matches!(model_route(c, provider, id), Some(Err(_))))
+            .map(|(id, m)| ModelInfo {
+                id: id.clone(),
+                display_name: if m.name.is_empty() {
+                    id.clone()
+                } else {
+                    m.name.clone()
+                },
+                context_window: m.context,
+                ..ModelInfo::default()
+            })
+            .collect(),
+    )
 }
 
 /// The base URL rig should use for a provider of `kind`. The Anthropic adapter adds `/v1/messages`
@@ -268,10 +337,49 @@ mod tests {
             "deepseek": {"name": "DeepSeek", "api": "https://api.deepseek.com", "npm": "@ai-sdk/openai-compatible",
                 "env": ["DEEPSEEK_API_KEY"],
                 "models": {"deepseek-v4-flash": {"name": "DeepSeek V4 Flash", "cost": {"input": 0.15, "output": 0.6}},
-                           "free-model": {"name": "Free"}}}
+                           "free-model": {"name": "Free"}}},
+            "opencode-go": {"name": "OpenCode Go", "api": "https://opencode.ai/inference/go/openai/v1",
+                "npm": "@ai-sdk/openai-compatible", "env": ["OPENCODE_API_KEY"],
+                "models": {
+                    "glm-5.3": {"name": "GLM-5.3", "limit": {"context": 200000},
+                        "provider": {"api": "https://opencode.ai/inference/go/openai/v1"}},
+                    "minimax-m3": {"name": "MiniMax M3",
+                        "provider": {"npm": "@ai-sdk/anthropic", "api": "https://opencode.ai/inference/go/anthropic/v1"}},
+                    "gpt-6-luna": {"name": "GPT-6 Luna",
+                        "provider": {"npm": "@ai-sdk/openai", "api": "https://opencode.ai/inference/go/openai/v1"}},
+                    "gemini-4-argon": {"name": "Gemini 4 Argon",
+                        "provider": {"npm": "@ai-sdk/google", "api": "https://opencode.ai/inference/go/google/v1beta"}}}}
         }"#;
         let parsed: BTreeMap<String, RawProvider> = serde_json::from_str(raw).unwrap();
         trim(parsed, 1000)
+    }
+
+    #[test]
+    fn gateway_models_route_to_the_api_the_catalog_names() {
+        let c = fixture();
+        let route = |m| model_route(&c, "opencode-go", m).unwrap();
+        let mm = route("minimax-m3").unwrap();
+        assert_eq!(
+            (mm.kind, mm.base_url.as_str()),
+            (
+                Kind::Anthropic,
+                "https://opencode.ai/inference/go/anthropic"
+            )
+        );
+        assert_eq!(route("gpt-6-luna").unwrap().kind, Kind::Responses);
+        assert_eq!(route("glm-5.3").unwrap().kind, Kind::Chat);
+        assert!(
+            route("gemini-4-argon")
+                .unwrap_err()
+                .contains("@ai-sdk/google")
+        );
+        assert!(model_route(&c, "opencode-go", "unlisted").is_none());
+        let ids: Vec<_> = models(&c, "opencode-go")
+            .unwrap()
+            .into_iter()
+            .map(|m| m.id)
+            .collect();
+        assert_eq!(ids, ["glm-5.3", "gpt-6-luna", "minimax-m3"]);
     }
 
     #[test]

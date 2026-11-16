@@ -12,7 +12,7 @@ use std::time::Instant;
 impl Tui {
     /// Add a finished turn's cost, from the list price of the model that served it.
     fn account_cost(&mut self, u: Usage) {
-        if self.info.spec.chatgpt_plan {
+        if self.info.spec.chatgpt_plan || self.info.spec.subscription {
             self.stats.plan_turns += 1;
             return;
         }

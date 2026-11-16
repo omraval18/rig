@@ -186,6 +186,11 @@ pub fn default_model(provider: &str) -> Option<&'static str> {
         "minimax" => "MiniMax-M3",
         "zai" => "glm-5.3",
         "kimi" => "kimi-k3",
+        "zai-coding-plan" => "glm-5.3",
+        "minimax-coding-plan" => "MiniMax-M3",
+        "kimi-coding-plan" => "kimi-for-coding",
+        "opencode" => "claude-sonnet-5-5",
+        "opencode-go" => "glm-5.3",
         _ => return None,
     })
 }

@@ -14,17 +14,14 @@ impl Tui {
         });
         let s = &self.stats;
         let cost = if s.plan_turns > 0 && s.cost == 0.0 && s.unpriced_turns == 0 {
-            "included in your ChatGPT plan".to_string()
+            "included in your plan".to_string()
         } else {
             let mut c = format!("≈ ${:.4} (list prices)", s.cost);
             if s.unpriced_turns > 0 {
                 c.push_str(&format!(", {} turn(s) without a price", s.unpriced_turns));
             }
             if s.plan_turns > 0 {
-                c.push_str(&format!(
-                    ", {} ChatGPT plan turn(s) not counted",
-                    s.plan_turns
-                ));
+                c.push_str(&format!(", {} plan turn(s) not counted", s.plan_turns));
             }
             c
         };

@@ -43,6 +43,8 @@ mod tests {
             web_search: false,
             default_model: Some("big-model".into()),
             catalog_id: None,
+            subscription: false,
+            routes: Vec::new(),
         };
         save(&path, &spec).unwrap();
         let back = load(&path);
