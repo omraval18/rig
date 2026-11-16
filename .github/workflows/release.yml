@@ -1,0 +1,106 @@
+# Builds the release archives, signs the checksum list, and attaches both to the GitHub release.
+#
+# Signing key: the RIG_MINISIGN_KEY secret, in the `release` environment. Only a job in that
+# environment can read it, and the environment should require a reviewer (see RELEASING.md).
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --target ${{ matrix.target }}
+          rustup default stable
+      - name: The tag must match the crate version
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -eu
+          crate="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print([p for p in json.load(sys.stdin)["packages"] if p["name"]=="rig-cli"][0]["version"])')"
+          if [ "v${crate}" != "$VERSION" ]; then
+            echo "tag $VERSION does not match rig-cli version $crate" >&2
+            exit 1
+          fi
+      - name: Build
+        run: cargo build --release --locked -p rig-cli --target ${{ matrix.target }}
+      - name: Package
+        env:
+          VERSION: ${{ github.ref_name }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -eu
+          version="${VERSION#v}"
+          name="rig-${version}-${TARGET}"
+          mkdir -p "dist/${name}"
+          cp "target/${TARGET}/release/rig" "dist/${name}/rig"
+          cp install.sh README.md CHANGELOG.md "dist/${name}/"
+          tar -C dist -czf "dist/${name}.tar.gz" "${name}"
+          rm -rf "dist/${name}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: archive-${{ matrix.target }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: |
+          set -eu
+          cd dist
+          sha256sum rig-*.tar.gz > SHA256SUMS
+          cat SHA256SUMS
+      - name: Sign the checksum list
+        env:
+          MINISIGN_KEY: ${{ secrets.RIG_MINISIGN_KEY }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -eu
+          sudo apt-get update -qq && sudo apt-get install -y -qq minisign
+          umask 077
+          printf '%s\n' "$MINISIGN_KEY" > minisign.key
+          minisign -S -W -s minisign.key -m dist/SHA256SUMS -x dist/SHA256SUMS.minisig -t "rig ${VERSION}"
+          rm -f minisign.key
+      - name: Check the signature against the committed public key
+        run: |
+          set -eu
+          # The public key lives in the repo, so a wrong secret fails here, before anything is published.
+          minisign -V -p minisign.pub -m dist/SHA256SUMS -x dist/SHA256SUMS.minisig
+      - name: Publish to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -eu
+          gh release view "$VERSION" >/dev/null 2>&1 || gh release create "$VERSION" --title "rig ${VERSION#v}" --verify-tag
+          gh release upload "$VERSION" dist/*.tar.gz dist/SHA256SUMS dist/SHA256SUMS.minisig --clobber
