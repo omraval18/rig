@@ -42,6 +42,22 @@ fn what_you_used_last_beats_the_config_file_and_a_flag_beats_both() {
 }
 
 #[test]
+fn doctor_checks_the_requested_model_and_its_credentials() {
+    let a = app(
+        State {
+            model: Some("doctor-test-isolated-profile".into()),
+            ..State::default()
+        },
+        None,
+    );
+    assert_eq!(crate::subcommands::doctor(&a, Some("ollama/test")), 0);
+    assert_eq!(crate::subcommands::doctor(&a, Some("unknown/test")), 1);
+    assert_eq!(crate::subcommands::doctor(&a, Some("chatgpt/test")), 0);
+    std::fs::remove_file(a.paths.chatgpt_auth_file()).unwrap();
+    assert_eq!(crate::subcommands::doctor(&a, Some("chatgpt/test")), 1);
+}
+
+#[test]
 fn turning_remembering_off_falls_back_to_the_config_file() {
     let state = State {
         model: Some("chatgpt/gpt-6.1-terra".into()),

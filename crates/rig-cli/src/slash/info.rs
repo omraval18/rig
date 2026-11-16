@@ -7,31 +7,34 @@ use rig_core::sync::MutexExt;
 
 impl Tui {
     pub(super) fn cmd_stats(&mut self) {
-        let t = self.stats.total;
         let id = self.session.locked().id.clone();
         let ctx = self.info.ctx_pct.map_or("unknown".into(), |p| {
             format!("{p}% of {}", fmt_tokens(self.info.context_window))
         });
-        let s = &self.stats;
-        let cost = if s.plan_turns > 0 && s.cost == 0.0 && s.unpriced_turns == 0 {
-            "included in your plan".to_string()
-        } else {
-            let mut c = format!("≈ ${:.4} (list prices)", s.cost);
-            if s.unpriced_turns > 0 {
-                c.push_str(&format!(", {} turn(s) without a price", s.unpriced_turns));
-            }
-            if s.plan_turns > 0 {
-                c.push_str(&format!(", {} plan turn(s) not counted", s.plan_turns));
-            }
-            c
-        };
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let session = usage_summary(&self.stats);
         self.say(&format!(
-            "turns {} · {} in · {} out · {} cached\ncost {cost}\ncontext {ctx} · session {id}",
-            s.turns,
-            fmt_tokens(t.input),
-            fmt_tokens(t.output),
-            fmt_tokens(t.cached)
+            "Session {id}\n{session}\ncontext {ctx}\n\nCalculating the last 30 days…"
         ));
+        let root = self.app.paths.root.clone();
+        let tx = self.tx.clone();
+        std::thread::spawn(move || {
+            let rolling = rig_core::session::Session::usage_all(
+                &root,
+                now.saturating_sub(30 * 24 * 60 * 60),
+                now,
+            );
+            let rolling = match rolling {
+                Ok(entries) => usage_summary(&crate::tui::Stats::from_entries(&entries)),
+                Err(e) => format!("unavailable: {e}"),
+            };
+            let _ = tx.send(crate::runtime::Ev::Notice(format!(
+                "Last 30 days · this profile, all projects\n{rolling}\n\nUsage is recorded from this version onward; estimates use list prices and exclude unpriced and subscription usage."
+            )));
+        });
     }
 
     pub(super) fn cmd_status(&mut self) {
@@ -113,4 +116,19 @@ impl Tui {
             Err(e) => self.error(&e),
         }
     }
+}
+
+fn usage_summary(s: &crate::tui::Stats) -> String {
+    let t = s.total;
+    format!(
+        "{} jobs · {} in · {} out · {} cache read · {} cache write\nestimated cost ≈ ${:.4} · {} unpriced · {} subscription",
+        s.turns,
+        fmt_tokens(t.input),
+        fmt_tokens(t.output),
+        fmt_tokens(t.cached),
+        fmt_tokens(t.cache_write),
+        s.cost,
+        s.unpriced_turns,
+        s.plan_turns,
+    )
 }

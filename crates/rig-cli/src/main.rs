@@ -222,7 +222,7 @@ fn main() {
         Some(Cmd::Login { provider }) => subcommands::login(&app, &provider),
         Some(Cmd::Logout) => subcommands::logout(&app),
         Some(Cmd::Models) => subcommands::models(&app),
-        Some(Cmd::Doctor) => subcommands::doctor(&app),
+        Some(Cmd::Doctor) => subcommands::doctor(&app, opts.model.as_deref()),
         Some(Cmd::Key(cmd)) => subcommands::key(app, &cmd),
         Some(Cmd::Profile(_)) => 0,
         Some(Cmd::Update { .. }) => unreachable!("handled before the app starts"),

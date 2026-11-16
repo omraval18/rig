@@ -58,7 +58,7 @@ pub enum StreamEvent<'a> {
     Reasoning(&'a str),
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Usage {
     /// All prompt tokens, including the cached and the written ones below.
     pub input: u64,

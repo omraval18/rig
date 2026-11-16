@@ -5,6 +5,32 @@ use rig_core::message::Block;
 use std::time::Duration;
 
 #[test]
+fn uncaptured_wheel_arrows_scroll_unless_navigating_completion() {
+    use crossterm::event::KeyModifiers;
+
+    assert!(super::keys::scroll_with_arrow(
+        false,
+        KeyModifiers::NONE,
+        false
+    ));
+    assert!(!super::keys::scroll_with_arrow(
+        false,
+        KeyModifiers::ALT,
+        false
+    ));
+    assert!(!super::keys::scroll_with_arrow(
+        false,
+        KeyModifiers::NONE,
+        true
+    ));
+    assert!(!super::keys::scroll_with_arrow(
+        true,
+        KeyModifiers::NONE,
+        false
+    ));
+}
+
+#[test]
 fn errors_are_explained_and_retryable_ones_say_so() {
     use rig_core::provider::ProviderError as P;
     let (m, retry) = explain(

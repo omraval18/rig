@@ -23,14 +23,14 @@
 curl -fsSL https://raw.githubusercontent.com/omraval18/rig/main/install.sh | sh
 ```
 
-This builds rig from source with Cargo and installs `rig` to `~/.local/bin`. You need Rust, from [rustup.rs](https://rustup.rs). To read the script before running it:
+The installer downloads a prebuilt macOS release when available, checks its SHA-256 checksum, and installs `rig` to `~/.local/bin`. Otherwise it builds from source, which requires Git and Rust from [rustup.rs](https://rustup.rs). To read the script before running it:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/omraval18/rig/main/install.sh -o install.sh
 less install.sh && sh install.sh
 ```
 
-From a checkout, `./install.sh` builds that checkout instead. Set `RIG_INSTALL_DIR` to install somewhere else.
+From a checkout, `./install.sh` builds that checkout instead. Set `RIG_FROM_SOURCE=1` to force a source build, `RIG_VERSION` to select a release, or `RIG_INSTALL_DIR` to install somewhere else.
 
 ## Sign in
 
@@ -39,7 +39,7 @@ rig login codex                # ChatGPT subscription (browser sign-in)
 rig key set anthropic          # or an API key, saved in the active profile (input hidden)
 export ANTHROPIC_API_KEY=...   # or use the environment: also OPENAI_API_KEY, XAI_API_KEY, OPENROUTER_API_KEY
 rig models                     # providers, default models, credential status
-rig doctor                     # check the setup
+rig doctor                     # check the setup (--model provider/model to check another)
 ```
 
 Inside rig, `/provider` lists the providers. Choosing one that has no key opens a masked box for it.
@@ -75,7 +75,8 @@ Commands: `/new` (`/clear`), `/resume`, `/fork`, `/rename`, `/compact`, `/model`
 
 rig takes over the whole terminal window (the alternate screen, like vim): the conversation fills the window, the prompt box is pinned to the bottom, and your shell is untouched when you quit. Only rows that changed are repainted, in one write, with the cursor hidden meanwhile, so resizing the window cannot leave stale or duplicated input boxes and the cursor never flickers around the screen. Text is wrapped at word boundaries (list items keep a hanging indent).
 
-- **Scroll:** mouse wheel, PageUp / PageDown; End jumps back to the latest. Hold Shift (Option on macOS) to select text with the mouse, or turn mouse capture off in `/settings`. `/copy` copies the last reply.
+- **Select and copy:** drag across the conversation to select text; hold the pointer at the top or bottom edge to keep scrolling while selecting. The selection is copied on release. `/copy` copies the last reply without selecting it.
+- **Scroll:** use the mouse wheel or PageUp / PageDown; End jumps back to the latest. Mouse interaction is on by default and can be disabled in `/settings` → **Mouse interaction** for native terminal selection. With it off, Up / Down also scroll (some terminals send these keys for the wheel); use Alt+Up / Alt+Down to navigate prompt lines and history. Existing saved mouse settings are preserved.
 - **`/new`, `/resume`, `/fork`** clear the window down to the new session's own messages.
 - **Per-session settings:** every session records the model, effort and permissions it uses. `rig -c`, `rig --resume <id>` and `/resume` bring that session's own setup back, whatever other sessions used since (flags still win). New chats use what you used last.
 
@@ -100,7 +101,7 @@ Want a provider that isn't built in? `/provider` → **Search models.dev…** fi
 
 ### Cost
 
-`/stats` shows the session's estimated cost from list prices. Cached prompt tokens and prompt tokens written to the cache are billed at their own rates, as the providers bill them. The prices come from models.dev and are built into the binary, so they can be a little out of date; `scripts/gen_prices.py` refreshes them. ChatGPT plan turns are not billed per token, and models without a known price are counted separately rather than guessed.
+`/stats` shows the current session's input, output, cache-read and cache-write tokens and estimated cost, plus totals for the last 30 days across projects in the active profile. Usage is saved with the session and restored when it is resumed; older sessions have no historical usage records. Estimates use the list price available when each job completes, not a provider invoice. Cached prompt tokens and prompt tokens written to the cache are priced separately. The built-in prices come from models.dev and can be a little out of date; `scripts/gen_prices.py` refreshes them. Subscription usage (a ChatGPT plan, OpenCode Go, coding plans) and models without a known price are counted separately rather than guessed.
 
 ### Loops
 

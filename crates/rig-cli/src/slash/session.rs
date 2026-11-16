@@ -27,6 +27,9 @@ impl Tui {
         let Some(agent) = self.agent.as_mut() else {
             return;
         };
+        self.stats = Session::usage(&session.path, 0, u64::MAX)
+            .map(|entries| crate::tui::Stats::from_entries(&entries))
+            .unwrap_or_default();
         agent.history = history;
         agent.ctx.session_id = session.id.clone();
         *self.shared.archive.locked() = Some(archive_path(&session.path));
@@ -231,6 +234,9 @@ impl Tui {
     }
 
     pub(super) fn cmd_undo(&mut self) {
+        if !self.idle_agent() {
+            return;
+        }
         match rig_tools::undo_last(&self.shared) {
             Some(m) => self.say(&m),
             None => self.say("Nothing to undo."),
