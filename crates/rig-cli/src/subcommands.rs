@@ -185,7 +185,7 @@ pub fn models(app: &App) -> i32 {
     0
 }
 
-pub fn doctor(app: &App) -> i32 {
+pub fn doctor(app: &App, model: Option<&str>) -> i32 {
     let mut bad = 0;
     let mut check = |ok: bool, what: String| {
         println!("{} {what}", if ok { "✓" } else { "✗" });
@@ -225,17 +225,54 @@ pub fn doctor(app: &App) -> i32 {
             .is_ok_and(|s| s.success()),
         "sh available for Execute".into(),
     );
-    check(
-        Command::new("git").arg("--version").output().is_ok(),
-        "git available (used for context; optional)".into(),
-    );
-    match app.resolve_model(None) {
-        Ok((s, m)) => check(true, format!("default model {}/{m}", s.name)),
+    if !Command::new("git")
+        .arg("--version")
+        .output()
+        .is_ok_and(|s| s.status.success())
+    {
+        println!("  git not found (optional; install Git for repository context)");
+    }
+    match app.resolve_model(model) {
+        Ok((s, m)) => {
+            check(true, format!("selected model {}/{m}", s.name));
+            let credential = app.credential(&s);
+            let hint = match &credential {
+                Credential::Plan { signed_in: false } => "run `rig login codex`".to_string(),
+                Credential::Missing(_) => {
+                    format!("run `rig key set {}` or configure its key", s.name)
+                }
+                _ => credential.describe(),
+            };
+            check(credential.usable(), format!("provider credentials: {hint}"));
+        }
         Err(e) => check(false, format!("default model: {e}")),
     }
     match chatgpt::status(&app.paths.chatgpt_auth_file()) {
         Ok(st) => check(true, st),
         Err(_) => println!("  ChatGPT: not signed in (rig login codex)"),
     }
+    if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
+        println!(
+            "  terminal: stdin or stdout is not a terminal; run `rig` in an interactive terminal for the UI"
+        );
+    } else if std::env::var("TERM").map_or(true, |term| term.is_empty() || term == "dumb") {
+        println!("  terminal: TERM is unset or dumb; use a terminal with cursor and color support");
+    } else {
+        println!("  terminal: interactive (capabilities not tested)");
+    }
+    if cfg!(target_os = "linux") && !command_on_path("wl-paste") && !command_on_path("xclip") {
+        println!("  image clipboard: optional; install wl-clipboard or xclip to paste images");
+    }
+    if !command_on_path("rig") {
+        println!("  PATH: rig not found; add its install directory to PATH");
+    }
+    println!(
+        "  Provider connectivity and model availability were not tested (no network requests)."
+    );
     if bad == 0 { 0 } else { 1 }
+}
+
+fn command_on_path(name: &str) -> bool {
+    std::env::var_os("PATH")
+        .is_some_and(|path| std::env::split_paths(&path).any(|dir| dir.join(name).is_file()))
 }

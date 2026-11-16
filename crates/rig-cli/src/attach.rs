@@ -61,7 +61,7 @@ pub fn dropped_image_path(pasted: &str) -> Option<PathBuf> {
 }
 
 impl Tui {
-    fn attach(&mut self, block: Block, what: &str) {
+    pub(crate) fn attach(&mut self, block: Block, what: &str) {
         let n = self.prompt.next_image;
         self.prompt.next_image += 1;
         let size = if let Block::Image { data, .. } = &block {
@@ -87,14 +87,17 @@ impl Tui {
 
     /// Ctrl+V and `/paste`: the image on the clipboard, if there is one.
     pub fn paste_clipboard_image(&mut self) {
-        match desktop::read_image() {
-            Ok(Some((mime, bytes))) => match image::from_bytes(mime, bytes) {
-                Ok(b) => self.attach(b, "image from the clipboard"),
-                Err(e) => self.notice(e),
-            },
-            Ok(None) => self.notice("no image on the clipboard"),
-            Err(e) => self.notice(e),
-        }
+        self.prompt.pending_images += 1;
+        self.notice("Preparing clipboard image… wait for it to appear before sending");
+        let tx = self.tx.clone();
+        std::thread::spawn(move || {
+            let result = desktop::read_image().and_then(|image| match image {
+                Some((mime, bytes)) => image::from_bytes(mime, bytes)
+                    .map(|block| (block, "image from the clipboard".to_string())),
+                None => Err("no image on the clipboard".to_string()),
+            });
+            let _ = tx.send(crate::runtime::Ev::ImageReady(result));
+        });
     }
 
     /// Text pasted into the prompt. An image file path becomes an attachment; an empty paste
@@ -104,15 +107,17 @@ impl Tui {
             return self.paste_clipboard_image();
         }
         if let Some(path) = dropped_image_path(s) {
-            match image::load(&path) {
-                Ok(b) => {
-                    let name = path
-                        .file_name()
-                        .map_or_else(|| "image".into(), |n| n.to_string_lossy().into_owned());
-                    return self.attach(b, &name);
-                }
-                Err(e) => return self.notice(e),
-            }
+            self.prompt.pending_images += 1;
+            self.notice("Preparing image… wait for it to appear before sending");
+            let tx = self.tx.clone();
+            std::thread::spawn(move || {
+                let name = path
+                    .file_name()
+                    .map_or_else(|| "image".into(), |n| n.to_string_lossy().into_owned());
+                let result = image::load(&path).map(|block| (block, name));
+                let _ = tx.send(crate::runtime::Ev::ImageReady(result));
+            });
+            return;
         }
         self.prompt.composer.insert_str(s);
         self.refresh_completion();

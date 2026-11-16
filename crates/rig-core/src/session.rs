@@ -48,6 +48,20 @@ enum Record<'a> {
     Truncate {
         len: usize,
     },
+    Usage {
+        entry: UsageEntry,
+    },
+}
+
+/// Usage is recorded when a job completes, with its price at that time. It is not
+/// removed when conversation history is truncated: the provider has already billed it.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct UsageEntry {
+    pub timestamp: u64,
+    pub usage: crate::provider::Usage,
+    /// None means the price was unavailable or the request used a subscription.
+    pub cost: Option<f64>,
+    pub plan: bool,
 }
 
 /// The model, reasoning effort and permission level a session was using.
@@ -241,6 +255,55 @@ impl Session {
 
     pub fn append_truncate(&mut self, len: usize) -> io::Result<()> {
         self.write(&Record::Truncate { len })
+    }
+
+    pub fn append_usage(&mut self, entry: UsageEntry) -> io::Result<()> {
+        self.write(&Record::Usage { entry })
+    }
+
+    /// Read only usage records; conversation and image data are never deserialized.
+    pub fn usage(path: &Path, since: u64, until: u64) -> io::Result<Vec<UsageEntry>> {
+        let mut entries = Vec::new();
+        for line in BufReader::new(File::open(path)?).lines() {
+            let line = line?;
+            if !matches!(record_kind(&line), Some("usage") | None) {
+                continue;
+            }
+            if let Ok(Record::Usage { entry }) = serde_json::from_str(&line)
+                && entry.timestamp >= since
+                && entry.timestamp <= until
+            {
+                entries.push(entry);
+            }
+        }
+        Ok(entries)
+    }
+
+    /// Usage across all projects in this profile, over the requested time interval.
+    pub fn usage_all(root: &Path, since: u64, until: u64) -> io::Result<Vec<UsageEntry>> {
+        let dirs = match fs::read_dir(root.join("sessions")) {
+            Ok(dirs) => dirs,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(e),
+        };
+        let mut entries = Vec::new();
+        for dir in dirs {
+            let dir = dir?;
+            if !dir.file_type()?.is_dir() {
+                continue;
+            }
+            for file in fs::read_dir(dir.path())? {
+                let file = file?;
+                let path = file.path();
+                if file.file_type()?.is_file()
+                    && path.extension().is_some_and(|e| e == "jsonl")
+                    && !path.to_string_lossy().ends_with(".archive.jsonl")
+                {
+                    entries.extend(Self::usage(&path, since, until)?);
+                }
+            }
+        }
+        Ok(entries)
     }
 
     pub fn set_title(&mut self, title: &str) -> io::Result<()> {

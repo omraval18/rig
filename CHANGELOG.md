@@ -4,6 +4,21 @@ All notable changes to rig are recorded here. The format follows [Keep a Changel
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-16
+
+### Added
+
+- Select and copy transcript text with the mouse: drag across the conversation to select it, hold the pointer at the top or bottom edge to keep scrolling, and release to copy. Mouse interaction can be turned off in `/settings`.
+- Usage is saved with each session: every completed job records its tokens, its cost at the list price of the time, and whether a subscription paid for it. `/stats` restores a resumed session's totals and adds the last 30 days across all projects in the profile, with cache-write tokens and subscription jobs shown separately. Sessions written by older versions have no usage records; older versions ignore the new records.
+- `rig doctor --model provider/model` checks a specific model. `rig doctor` now also checks the selected provider's credentials and reports optional terminal, PATH and clipboard hints, without contacting the provider.
+- CI checks formatting, clippy and tests on Linux and macOS for pull requests and pushes to `main`. A release workflow builds, checksums and signs a release when a `v*` tag is pushed, once the signing key in RELEASING.md is set up.
+
+### Changed
+
+- Images from the clipboard or a file are read and resized off the terminal thread, so the UI no longer freezes on a large screenshot. Sending waits until they are attached.
+- Scrolling stays within the transcript, and terminals that turn the mouse wheel into arrow keys when mouse capture is off scroll correctly.
+- Turns with only prompt tokens (for example, a cancelled reply) are counted in usage.
+
 ## [0.3.1] - 2026-11-16
 
 ### Added

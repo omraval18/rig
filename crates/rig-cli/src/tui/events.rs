@@ -15,7 +15,9 @@ impl Tui {
             {
                 self.dirty = true;
             }
-            if (self.turn.running.is_some() || self.turn.compacting)
+            if (self.turn.running.is_some()
+                || self.turn.compacting
+                || self.prompt.pending_images > 0)
                 && self.display.last_tick.elapsed() >= Duration::from_millis(100)
             {
                 self.display.spinner += 1;

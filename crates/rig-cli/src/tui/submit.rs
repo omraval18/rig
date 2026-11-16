@@ -51,6 +51,10 @@ impl Tui {
     }
 
     pub fn submit(&mut self) {
+        if self.prompt.pending_images > 0 {
+            self.notice("Preparing image… please wait before sending");
+            return;
+        }
         let text = self.prompt.composer.submit();
         self.prompt.completion = None;
         if text.trim().is_empty() {

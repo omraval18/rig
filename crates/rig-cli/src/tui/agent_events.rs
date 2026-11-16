@@ -53,6 +53,13 @@ impl Tui {
             } => self.open_question(question, options, reply),
             Ev::Models { provider, models } => self.on_models(&provider, models),
             Ev::Notice(text) => self.say(&text),
+            Ev::ImageReady(result) => {
+                self.prompt.pending_images = self.prompt.pending_images.saturating_sub(1);
+                match result {
+                    Ok((block, name)) => self.attach(block, &name),
+                    Err(error) => self.notice(error),
+                }
+            }
             Ev::RolledBack => self.turn.rolled_back = true,
             Ev::LoginDone(Ok(message)) => {
                 self.say(&message);

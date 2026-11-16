@@ -11,6 +11,41 @@ fn tmp(tag: &str) -> PathBuf {
 }
 
 #[test]
+fn usage_is_persisted_per_session_and_aggregated_across_projects() {
+    let root = tmp("usage");
+    let mut a = Session::create(&root, Path::new("/one"), "m").unwrap();
+    a.append(&Message::user("hello")).unwrap();
+    let entry = |timestamp, cost, plan| UsageEntry {
+        timestamp,
+        usage: crate::provider::Usage {
+            input: 100,
+            output: 20,
+            cached: 10,
+            cache_write: 5,
+        },
+        cost,
+        plan,
+    };
+    a.append_usage(entry(99, Some(0.01), false)).unwrap();
+    a.append_usage(entry(100, None, true)).unwrap();
+    a.append_truncate(0).unwrap();
+    let mut b = Session::create(&root, Path::new("/two"), "m").unwrap();
+    b.append(&Message::user("hello")).unwrap();
+    b.append_usage(entry(200, None, false)).unwrap();
+    let own = Session::usage(&a.path, 0, u64::MAX).unwrap();
+    assert_eq!(own.len(), 2);
+    assert_eq!(own[0].cost, Some(0.01));
+    assert_eq!(own[0].usage.cache_write, 5);
+    assert!(own[1].plan);
+    let rolling = Session::usage_all(&root, 100, 199).unwrap();
+    assert_eq!(rolling.len(), 1);
+    assert!(rolling[0].plan);
+    assert_eq!(Session::usage_all(&root, 0, 200).unwrap().len(), 3);
+    assert!(Session::load(&a.path).unwrap().is_empty());
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
 fn roundtrip_title_and_listing() {
     let root = tmp("a");
     let cwd = Path::new("/work/proj");

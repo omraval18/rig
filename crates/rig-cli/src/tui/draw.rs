@@ -52,6 +52,11 @@ impl Tui {
                 "{} Compacting context…",
                 SPIN[self.display.spinner % SPIN.len()]
             ))
+        } else if self.turn.running.is_none() && self.prompt.pending_images > 0 {
+            Some(format!(
+                "{} Preparing image · sending is paused",
+                SPIN[self.display.spinner % SPIN.len()]
+            ))
         } else {
             self.turn.running.map(|t| {
                 let queued = self.queue.locked().len();

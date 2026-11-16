@@ -11,10 +11,9 @@ use std::time::Instant;
 
 impl Tui {
     /// Add a finished turn's cost, from the list price of the model that served it.
-    fn account_cost(&mut self, u: Usage) {
+    fn current_price(&self) -> Option<rig_core::pricing::Price> {
         if self.info.spec.chatgpt_plan || self.info.spec.subscription {
-            self.stats.plan_turns += 1;
-            return;
+            return None;
         }
         let built_in = rig_core::pricing::lookup(&self.info.spec.name, &self.info.model);
         // Providers added from models.dev carry their catalog id, which prices their models.
@@ -23,10 +22,7 @@ impl Tui {
             let cat = crate::catalog::load(&self.app.paths.base)?;
             crate::catalog::price(&cat, id, &self.info.model)
         };
-        match built_in.or_else(from_catalog) {
-            Some(price) => self.stats.cost += price.cost(&u),
-            None => self.stats.unpriced_turns += 1,
-        }
+        built_in.or_else(from_catalog)
     }
 
     pub(super) fn finish_job(
@@ -43,6 +39,7 @@ impl Tui {
         let elapsed = self.turn.running.take().map(|t| t.elapsed());
         self.prompt.approval = None;
         self.prompt.question = None;
+        let mut continue_goal = false;
         match &result {
             Ok(o) => {
                 if let Some((m, t, bad)) = o.compacted {
@@ -63,7 +60,7 @@ impl Tui {
                 }
                 // A turn that ran as part of a goal is followed by the next round (or the end).
                 if o.compacted.is_none() && !o.nothing_to_compact && o.summary.is_none() {
-                    self.goal_after_turn();
+                    continue_goal = true;
                 }
             }
             Err(AgentError::Cancelled) => {
@@ -91,10 +88,21 @@ impl Tui {
         }
         self.turn.rolled_back = false;
         let u = self.turn.usage;
-        if u.output > 0 {
-            self.stats.turns += 1;
-            self.stats.total += u;
-            self.account_cost(u);
+        if u.input > 0 || u.output > 0 || u.cached > 0 || u.cache_write > 0 {
+            let entry = rig_core::session::UsageEntry {
+                timestamp: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs(),
+                usage: u,
+                cost: self.turn.price.map(|price| price.cost(&u)),
+                plan: self.turn.plan,
+            };
+            self.stats.add(&entry);
+            let saved = self.session.locked().append_usage(entry);
+            if let Err(e) = saved {
+                self.error(&format!("Could not save usage for this session: {e}"));
+            }
             let cached = if u.cached > 0 {
                 format!(" · {} cached", fmt_tokens(u.cached))
             } else {
@@ -130,6 +138,8 @@ impl Tui {
                 role: Role::User,
                 blocks,
             }));
+        } else if continue_goal {
+            self.goal_after_turn();
         }
         self.dirty = true;
     }
@@ -151,6 +161,8 @@ impl Tui {
             .cancel
             .store(false, std::sync::atomic::Ordering::Relaxed);
         self.turn.running = Some(Instant::now());
+        self.turn.price = self.current_price();
+        self.turn.plan = self.info.spec.chatgpt_plan || self.info.spec.subscription;
         self.turn.reply.clear();
         self.turn.usage = Usage::default();
         runtime::spawn(agent, job, self.channel_ui());

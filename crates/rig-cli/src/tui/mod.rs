@@ -235,6 +235,9 @@ impl Tui {
         let shared = agent.ctx.shared.clone();
         let policy = agent.policy.clone();
         let saved_allowlist = policy.allowlist();
+        let stats = Session::usage(&s.session.path, 0, u64::MAX)
+            .map(|entries| Stats::from_entries(&entries))
+            .unwrap_or_default();
         let mut t = Tui {
             app,
             prompt: Prompt::new(history),
@@ -253,7 +256,7 @@ impl Tui {
             info,
             pending: PendingChange::default(),
             show_reasoning: app_show_reasoning,
-            stats: Stats::default(),
+            stats,
             quit: false,
             switch_profile: None,
             update_poll: Instant::now(),

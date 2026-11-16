@@ -60,6 +60,8 @@ pub enum Ev {
         models: Result<Vec<ModelInfo>, String>,
     },
     Notice(String),
+    /// An image was read and prepared off the terminal thread.
+    ImageReady(Result<(rig_core::message::Block, String), String>),
     /// The turn failed before the model answered; the prompt was taken back out of the history.
     RolledBack,
     LoginDone(Result<String, String>),

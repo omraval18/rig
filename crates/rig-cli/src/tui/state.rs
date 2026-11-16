@@ -61,6 +61,28 @@ pub struct Stats {
     pub plan_turns: u64,
 }
 
+impl Stats {
+    pub fn add(&mut self, entry: &rig_core::session::UsageEntry) {
+        self.turns += 1;
+        self.total += entry.usage;
+        if entry.plan {
+            self.plan_turns += 1;
+        } else if let Some(cost) = entry.cost {
+            self.cost += cost;
+        } else {
+            self.unpriced_turns += 1;
+        }
+    }
+
+    pub fn from_entries(entries: &[rig_core::session::UsageEntry]) -> Self {
+        let mut stats = Self::default();
+        for entry in entries {
+            stats.add(entry);
+        }
+        stats
+    }
+}
+
 /// What the last printed transcript block was. A blank line separates different kinds, never
 /// lines of the same kind, so replies, tool activity, notes and your own messages each read as a unit.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -94,6 +116,8 @@ pub struct Prompt {
     pub question: Option<super::question::PendingQuestion>,
     pub approval: Option<PendingApproval>,
     pub attachments: Vec<crate::attach::Attachment>,
+    /// Images still being read or resized on worker threads.
+    pub pending_images: usize,
     pub next_image: usize,
 }
 
@@ -108,6 +132,7 @@ impl Prompt {
             question: None,
             approval: None,
             attachments: Vec::new(),
+            pending_images: 0,
             next_image: 1,
         }
     }
@@ -122,6 +147,9 @@ pub struct Turn {
     pub partial: String,
     pub reasoning_buf: String,
     pub usage: Usage,
+    /// Pricing and subscription status of the provider that started this job.
+    pub price: Option<rig_core::pricing::Price>,
+    pub plan: bool,
     /// The assistant text of this turn so far, and of the last finished one (`/copy`).
     pub reply: String,
     pub last_reply: String,
