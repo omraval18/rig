@@ -72,9 +72,21 @@ impl Tui {
         let Ok(provider) = self.app.build_provider(&spec, &self.info.model) else {
             return;
         };
+        // A gateway's own list does not say which API each model needs, so the catalog lists them.
+        let base = self.app.paths.base.clone();
         let tx = self.tx.clone();
         std::thread::spawn(move || {
-            let models = provider.list_models().map_err(|e| e.to_string());
+            let from_catalog = || {
+                let id = spec
+                    .catalog_id
+                    .as_deref()
+                    .filter(|_| !spec.routes.is_empty())?;
+                crate::catalog::models(&crate::catalog::ensure(&base).ok()?, id)
+            };
+            let models = match from_catalog() {
+                Some(models) => Ok(models),
+                None => provider.list_models().map_err(|e| e.to_string()),
+            };
             let _ = tx.send(Ev::Models {
                 provider: spec.name,
                 models,

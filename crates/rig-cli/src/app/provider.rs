@@ -149,6 +149,14 @@ impl App {
         if spec.api_key.is_none() && !spec.chatgpt_plan {
             spec.api_key = self.keys.get(&spec.name).map(String::from);
         }
+        // A gateway learns from the catalog which API serves this model, ahead of its own routes.
+        if !spec.routes.is_empty()
+            && let Some(id) = spec.catalog_id.as_deref()
+            && let Some(cat) = crate::catalog::load(&self.paths.base)
+            && let Some(route) = crate::catalog::model_route(&cat, id, model)
+        {
+            spec.routes.insert(0, route?);
+        }
         rig_provider::build(&spec, model, &env).map_err(|e| e.to_string())
     }
 }

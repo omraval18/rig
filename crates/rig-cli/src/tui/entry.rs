@@ -113,6 +113,19 @@ impl Tui {
         let Some((provider, model)) = value.split_once('\t') else {
             return;
         };
+        // A built-in provider (OpenCode, a coding plan, ...) needs only its key, which it may have.
+        if let Ok(spec) = self.app.provider_spec(provider)
+            && !self.app.cfg.providers.contains_key(provider)
+        {
+            if self.app.has_credentials(&spec) {
+                if let Err(e) = self.switch_model(provider, model) {
+                    self.error(&e);
+                }
+            } else {
+                self.open_key_entry(provider);
+            }
+            return;
+        }
         let result = (|| -> Result<(), String> {
             let cat = catalog::ensure(&self.app.paths.base)?;
             let p = cat
@@ -266,6 +279,8 @@ impl Tui {
             web_search: false,
             default_model: Some(model.into()),
             catalog_id: catalog_id.map(String::from),
+            subscription: false,
+            routes: Vec::new(),
         };
         crate::providers::save(&self.app.paths.providers_file(), &spec)?;
         self.app.cfg.providers.insert(name.into(), spec);

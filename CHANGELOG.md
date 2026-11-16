@@ -4,7 +4,16 @@ All notable changes to rig are recorded here. The format follows [Keep a Changel
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-16
+
+### Added
+
+- OpenCode as built-in providers: `opencode` (Zen, pay as you go) and `opencode-go` (the Go subscription), both with `OPENCODE_API_KEY`. One key reaches every model the gateway lists: each model is sent to the API it needs (Anthropic Messages for Claude and some MiniMax/Qwen models, the Responses API for GPT, Chat Completions for the rest), as models.dev says, and `/model` lists them all. Models served only through Google's API are left out, because rig can't call that API yet.
+- Coding-plan providers: `zai-coding-plan` (Z.ai's coding endpoint, which plan keys need), `minimax-coding-plan` and `kimi-coding-plan`. Turns on a subscription (these and OpenCode Go) are counted with plan turns, not priced.
+
 ### Changed
+
+- Picking a built-in provider's model from "Search models.dev…" uses that provider instead of adding a copy.
 
 - `install.sh` installs the latest release for your Mac, checked against `SHA256SUMS`, so Rust is no longer needed. It builds from source only when no release exists for your machine or `RIG_FROM_SOURCE=1` is set.
 
