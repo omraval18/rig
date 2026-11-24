@@ -130,7 +130,6 @@ impl Tui {
         let current = here.then(|| self.info.model.clone());
         for id in current.into_iter().chain(default).filter(|m| !m.is_empty()) {
             if !models.iter().any(|m| m.id == id) {
-                let id = id.clone();
                 models.insert(
                     0,
                     ModelInfo {
