@@ -2,6 +2,8 @@
 
 use super::Tui;
 use crate::complete::{self, Kind, Sources, Trigger};
+use crate::picker::PickItem;
+use rig_core::commands::Cmd;
 
 impl Tui {
     pub fn refresh_completion(&mut self) {
@@ -27,12 +29,15 @@ impl Tui {
             .filter(|c| c.trigger == trigger)
             .map(|c| c.selected);
         let efforts = self.efforts_for_model();
+        let choices = match &trigger {
+            Trigger::Arg { cmd, .. } => self.arg_choices(*cmd),
+            _ => Vec::new(),
+        };
         let src = Sources {
             index: &self.index,
             skills: &self.skills,
-            models: &self.models,
+            choices: &choices,
             efforts: &efforts,
-            current_model: &self.info.model,
         };
         let mut c = complete::build(trigger, self.prompt.composer.cursor, &src);
         if let Some(sel) = keep_selection {
@@ -40,6 +45,26 @@ impl Tui {
         }
         self.prompt.completion = Some(c);
         self.dirty = true;
+    }
+
+    /// What a command's argument can be, when that depends on the app's state.
+    fn arg_choices(&self, cmd: Cmd) -> Vec<PickItem> {
+        match cmd {
+            Cmd::Model => self
+                .model_items(None)
+                .into_iter()
+                .filter(|i| i.value == i.label)
+                .collect(),
+            Cmd::Profile => self.profile_items(),
+            Cmd::Provider | Cmd::Login | Cmd::Logout => self
+                .app
+                .cfg
+                .providers()
+                .iter()
+                .map(|s| PickItem::labeled(&s.name).detail(self.app.credential(s).describe()))
+                .collect(),
+            _ => Vec::new(),
+        }
     }
 
     pub(super) fn accept_completion(&mut self, enter: bool) {

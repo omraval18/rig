@@ -1,6 +1,8 @@
 //! A one-line text box for something typed once: an API key, or a new profile's name.
 //! The TUI opens it over the composer; the view draws it; `tui/entry.rs` acts on it.
 
+use rig_provider::Kind;
+
 pub enum Purpose {
     /// Save an API key for this provider in the active profile.
     ApiKey {
@@ -8,27 +10,21 @@ pub enum Purpose {
     },
     /// Create a profile and switch to it.
     NewProfile,
-    /// Adding a provider, one answer per step: name, then (after the API style is picked) the
-    /// base URL, the key, and the model. Each step carries what the earlier ones gave.
-    ProviderName,
-    ProviderUrl {
-        name: String,
-        kind: String,
-    },
-    /// A model picked from models.dev: the key is the last step, and the rest is already known.
+    /// A custom endpoint: its URL, then its key. The rest is found by asking the server.
+    ProviderUrl,
     ProviderKey {
-        name: String,
-        kind: String,
         url: String,
-        /// Set when the provider came from the catalog: its model and its catalog id.
+    },
+    /// A provider from models.dev, where only the key is missing. `model` is set when one was picked.
+    ListedKey {
+        name: String,
         model: Option<String>,
-        catalog: Option<String>,
     },
     /// A few words to search models.dev for.
     CatalogSearch,
+    /// The server did not say what it serves: the model is typed.
     ProviderModel {
-        name: String,
-        kind: String,
+        kind: Kind,
         url: String,
         key: String,
     },

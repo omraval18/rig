@@ -56,6 +56,10 @@ impl Tui {
                     Ok(Event::Paste(s)) => {
                         if self.prompt.entry.is_some() {
                             self.paste_into_entry(&s);
+                        } else if self.prompt.approval.is_none()
+                            && let Some(p) = self.prompt.picker.as_mut()
+                        {
+                            p.paste(&s);
                         } else if self.prompt.picker.is_none() && self.prompt.approval.is_none() {
                             self.paste_text(&s);
                         }

@@ -38,7 +38,7 @@ impl Tui {
                 self.info.model
             )
         };
-        let tips = self.dim("/ commands · @ files · $ skills · Ctrl+V paste image · Esc interrupts · Shift+Tab permissions · Ctrl+P model");
+        let tips = self.dim("/ commands · @ files · $ skills · Ctrl+V paste image · Esc interrupts · Shift+Tab permissions · Ctrl+P model · Ctrl+O profile · /help");
         self.display
             .transcript
             .push_text(&format!("{title}\n{tips}"));

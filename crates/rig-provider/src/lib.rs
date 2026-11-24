@@ -135,6 +135,11 @@ pub fn builtin_specs() -> Vec<ProviderSpec> {
         subscription: true,
         ..spec(name, kind, base, Some(env))
     };
+    // models.dev has their models and prices, but no base URL.
+    let listed = |name: &str, base: &str, env: &str| ProviderSpec {
+        catalog_id: Some(name.into()),
+        ..spec(name, Kind::Chat, base, Some(env))
+    };
     let opencode = |name: &str, root: &str, anthropic: &[&str], subscription| ProviderSpec {
         catalog_id: Some(name.into()),
         subscription,
@@ -201,6 +206,9 @@ pub fn builtin_specs() -> Vec<ProviderSpec> {
             "https://api.deepseek.com",
             Some("DEEPSEEK_API_KEY"),
         ),
+        listed("groq", "https://api.groq.com/openai/v1", "GROQ_API_KEY"),
+        listed("mistral", "https://api.mistral.ai/v1", "MISTRAL_API_KEY"),
+        listed("cerebras", "https://api.cerebras.ai/v1", "CEREBRAS_API_KEY"),
         // The Anthropic adapter adds /v1/messages itself, so the base stops at /anthropic.
         spec(
             "minimax",

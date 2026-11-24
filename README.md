@@ -7,7 +7,7 @@
 - **Any model you have.** Your ChatGPT subscription, Anthropic, OpenAI, xAI, OpenRouter, Ollama, or any OpenAI-compatible server.
 - **Profiles.** Keep a work and a personal account, or two API keys, side by side. Each profile has its own logins, keys and settings.
 - **Full access on demand.** `rigd` is the same binary starting at full access, for trusted checkouts and containers.
-- **Keys from inside the app.** Choose a provider with no key and a masked box asks for it. Pick **+ New profile…** to create another profile.
+- **Keys from inside the app.** Choose a provider with no key and a masked box asks for it. Press Ctrl+O and type a new name to create another profile.
 - **Small on disk.** A ~3 MB binary. Sessions appear only once you send a message, and settings are not rewritten when unchanged.
 - **Local and inspectable.** Sessions are plain JSON Lines files on your disk. Network use is the model provider you chose, sign-in, and any web pages the agent fetches.
 
@@ -38,7 +38,9 @@ From a checkout, `./install.sh` builds that checkout instead. Set `RIG_FROM_SOUR
 rig login codex                # ChatGPT subscription (browser sign-in)
 rig key set anthropic          # or an API key, saved in the active profile (input hidden)
 export ANTHROPIC_API_KEY=...   # or use the environment: also OPENAI_API_KEY, XAI_API_KEY, OPENROUTER_API_KEY
-rig models                     # providers, default models, credential status
+rig login anthropic            # or an API key, the same way for any provider
+rig providers                  # providers, default models, credential status
+rig models sonnet              # models of every connected provider, as provider/model
 rig doctor                     # check the setup (--model provider/model to check another)
 ```
 
@@ -66,10 +68,10 @@ rig -c                                # continue the latest session in this dire
 | `$` | skill. Lists `SKILL.md` skills from `.rig/ .agents/ .claude/` `skills/` in the project and home; `$name` activates one for that message |
 | `Enter` while working | queues: the message is delivered after the current tool call, before the next model call |
 | `Esc` | interrupts the turn (streaming and running commands stop immediately) |
-| `Shift+Tab` / `Ctrl+P` | cycle permissions / model picker |
+| `Shift+Tab` / `Ctrl+P` | cycle permissions / model picker (`Ctrl+O`: profiles) |
 | `Alt+Enter`, `Ctrl+J`, trailing `\` | newline |
 
-Commands: `/new` (`/clear`), `/resume`, `/fork`, `/rename`, `/compact`, `/model`, `/effort`, `/permissions`, `/allowlist`, `/undo`, `/skills [list|show|create|path]`, `/copy`, `/reasoning`, `/status`, `/summary`, `/loop`, `/settings`, `/provider`, `/profile`, `/login`, `/logout`, `/stats`, `/version`, `/help`, `/quit`. `/help` groups them.
+Commands: `/new` (`/clear`), `/resume`, `/fork`, `/rename`, `/compact`, `/model`, `/effort`, `/permissions`, `/allowlist`, `/undo`, `/skills [list|show|create|path]`, `/copy`, `/reasoning`, `/status`, `/summary`, `/loop`, `/settings`, `/provider`, `/profile`, `/login`, `/logout`, `/refresh`, `/stats`, `/version`, `/help`, `/quit`. `/help` is a searchable list of commands and shortcuts; a mistyped command suggests the one you meant.
 
 ### Full-window UI
 
@@ -95,9 +97,17 @@ rig does not start a server until the model first searches for a tool, so unused
 
 ### Providers
 
-`/provider` lists the built-in providers and "+ Add provider…", which asks for a name, the API style (OpenAI- or Anthropic-compatible), the base URL, the key and a model ID. Built-in presets include DeepSeek, MiniMax, Z.ai, Kimi and Gemini, the coding plans of Z.ai, MiniMax and Kimi (`zai-coding-plan`, `minimax-coding-plan`, `kimi-coding-plan`), and OpenCode Zen and Go (`opencode`, `opencode-go`). With one OpenCode key you can use every model the gateway lists: rig sends each model to the API it needs (for example `/model opencode-go/minimax-m3` or `/model opencode/gpt-6-sol`). Providers you add are saved in your profile, so you don't edit `config.toml`. Base URLs are the API root: rig adds `/chat/completions` or `/messages` itself.
+`/provider` (or `/connect`) is one searchable list: what is connected, the built-in providers, and every models.dev provider rig can talk to. Pick one, enter its key (or sign in, for ChatGPT), and choose from its models. With no provider connected, rig opens on this list. Choosing a connected provider offers its models, a refresh, a new key, or disconnecting.
 
-Want a provider that isn't built in? `/provider` → **Search models.dev…** finds providers and models from the public catalog at models.dev. Pick a model and you're asked only for the key: the URL, API style, price and model come from the catalog. The copy is kept in your rig home and refreshed weekly, or with `/refresh-models`.
+For anything else, paste a URL into the list, or choose **+ Custom endpoint…**. rig asks for the key, finds out whether the API is OpenAI- or Anthropic-compatible, names the provider after its host and lists its models. If the server lists none, it asks for the API style and a model ID. Added providers are saved in your profile, so you don't edit `config.toml`.
+
+Gateways such as OpenCode Zen and Go (`opencode`, `opencode-go`) send each model to the API it needs.
+
+### Models
+
+`/model` (Ctrl+P) lists the models of every connected provider, under a heading per provider, with the ones you used last on top. Type any words to search across all of them (`openrouter sonnet`), ←/→ to jump between providers, and **Ctrl+R** to fetch fresh lists. `/model -` goes back to the previous model. Text that matches nothing can be used as a model ID as typed.
+
+Lists are fetched from the providers in the background (when older than 10 minutes) and kept in the profile's `models.json`, so the picker opens at once. `/refresh` fetches all of them plus the models.dev catalog, and says which models are new. From the shell: `rig models [words] [--refresh]`.
 
 ### Cost
 
@@ -159,6 +169,8 @@ A profile is a separate set of logins, API keys and settings: a work and a perso
 
 ```bash
 rig profile create work --use        # create it and use it from now on
+rig profile create oss --from work   # start with work's keys and settings (not its ChatGPT login)
+rig -p work                          # one run in it
 rig login codex                      # signs the *active* profile in to ChatGPT
 rig --profile personal login codex   # a different ChatGPT account in another profile
 rig key set anthropic                # keys are per profile too
@@ -168,7 +180,7 @@ rig profile use default
 rig profile remove work              # asks first; -y to skip
 ```
 
-In the UI, `/profile` lists profiles and `/profile <name>` (or picking one) restarts rig in it. The footer shows the profile name when it is not `default`.
+In the UI, Ctrl+O (or `/profile`) lists profiles; picking one restarts rig in it. Type a name that does not exist to create it, fresh or with this profile's keys and settings. `/profile remove <name>` asks first. The footer shows the profile name when it is not `default`.
 
 - The `default` profile is `~/.rig` itself, so an existing setup keeps working untouched. Other profiles live in `~/.rig/profiles/<name>/`, each with its own `auth.json`, `keys.json` (mode 0600), `config.toml`, `state.json`, `allowlist.json`, prompt history and sessions.
 - `~/.rig/config.toml` and `~/.rig/AGENTS.md` are shared; a profile's `config.toml` overrides the shared one, and a project's `.rig/config.toml` overrides both.

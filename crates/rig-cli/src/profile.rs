@@ -109,6 +109,33 @@ pub fn create(base: &Path, name: &str) -> Result<PathBuf, String> {
     Ok(d)
 }
 
+/// Create `name` with the keys, providers and settings of `from`. The ChatGPT login is left out:
+/// its refresh tokens rotate, so two copies would sign each other out.
+pub fn create_from(base: &Path, name: &str, from: &str) -> Result<PathBuf, String> {
+    check_exists(base, from)?;
+    let d = create(base, name)?;
+    // The default profile's config.toml is shared by every profile already.
+    let config = (from != DEFAULT).then_some(("config.toml", 0o644));
+    let files = [
+        ("keys.json", 0o600),
+        ("providers.json", 0o600),
+        ("state.json", 0o644),
+    ];
+    for (file, mode) in files.into_iter().chain(config) {
+        let src = dir(base, from).join(file);
+        let copied = match std::fs::read(&src) {
+            Ok(bytes) => rig_core::fsutil::write_atomic(&d.join(file), &bytes, mode).map(drop),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(e),
+        };
+        if let Err(e) = copied {
+            let _ = std::fs::remove_dir_all(&d);
+            return Err(format!("cannot copy {}: {e}", src.display()));
+        }
+    }
+    Ok(d)
+}
+
 /// Delete a named profile and everything in it. Switching away from it first is the caller's job.
 pub fn remove(base: &Path, name: &str) -> Result<PathBuf, String> {
     check_exists(base, name)?;
@@ -172,6 +199,27 @@ mod tests {
         );
         assert!(!b.join("profile").exists());
         assert!(remove(&b, DEFAULT).is_err());
+        std::fs::remove_dir_all(b).ok();
+    }
+
+    #[test]
+    fn a_copied_profile_gets_keys_and_settings_but_no_login() {
+        let b = base("copy");
+        std::fs::write(b.join("keys.json"), r#"{"openai":"k"}"#).unwrap();
+        std::fs::write(b.join("state.json"), "{}").unwrap();
+        std::fs::write(b.join("auth.json"), "{}").unwrap();
+        let d = create_from(&b, "work", DEFAULT).unwrap();
+        assert!(d.join("keys.json").is_file() && d.join("state.json").is_file());
+        assert!(!d.join("auth.json").exists());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(d.join("keys.json"))
+                .unwrap()
+                .permissions();
+            assert_eq!(mode.mode() & 0o777, 0o600);
+        }
+        assert!(create_from(&b, "x", "missing").is_err());
         std::fs::remove_dir_all(b).ok();
     }
 

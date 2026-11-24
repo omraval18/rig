@@ -57,7 +57,16 @@ pub enum Ev {
     },
     Models {
         provider: String,
+        seq: u64,
         models: Result<Vec<ModelInfo>, String>,
+    },
+    /// The models.dev catalog on disk is newer.
+    Catalog,
+    /// What a custom endpoint turned out to be.
+    Probed {
+        url: String,
+        key: String,
+        result: Result<(rig_provider::Kind, String, Vec<ModelInfo>), String>,
     },
     Notice(String),
     /// An image was read and prepared off the terminal thread.

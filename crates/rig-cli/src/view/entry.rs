@@ -16,7 +16,7 @@ pub(super) fn rows(e: &Entry, w: usize, color: bool) -> (Vec<String>, (usize, us
     let line = truncate(&format!("  {shown}"), w);
     let cursor = (1, width_of(&line));
     let help = dim(
-        &truncate(&format!("  {} · Enter save · Esc cancel", e.hint), w),
+        &truncate(&format!("  {} · Enter continue · Esc cancel", e.hint), w),
         color,
     );
     (vec![title, line, help], cursor)

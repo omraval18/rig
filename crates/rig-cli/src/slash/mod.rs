@@ -1,8 +1,11 @@
 //! Slash-command behavior and the pickers they open. One file per group of commands.
 
 mod account;
+mod help;
 mod info;
-mod model;
+pub(crate) mod model;
+mod profile;
+pub(crate) mod provider;
 mod session;
 mod settings;
 mod skills;
@@ -35,16 +38,14 @@ impl Tui {
             .split_once(char::is_whitespace)
             .map_or((body, ""), |(n, a)| (n, a.trim()));
         let Some(spec) = commands::lookup(name) else {
-            self.error(&format!(
-                "unknown command '/{name}'. Type / to see the list, or /help."
-            ));
-            return;
+            let hint = commands::suggest(name).map_or_else(
+                || "Type / to see the list, or /help.".to_string(),
+                |s| format!("Did you mean /{}?", s.name),
+            );
+            return self.error(&format!("unknown command '/{name}'. {hint}"));
         };
         match spec.cmd {
-            Cmd::Help => {
-                let t = commands::help_text();
-                self.out(t.trim_end());
-            }
+            Cmd::Help => self.open_help(),
             Cmd::Quit => self.quit = true,
             Cmd::Version => self.say(&format!("rig {}", env!("CARGO_PKG_VERSION"))),
             Cmd::New => self.cmd_new(),
@@ -70,10 +71,10 @@ impl Tui {
             Cmd::Reasoning => self.cmd_reasoning(),
             Cmd::Permissions => self.cmd_permissions(arg),
             Cmd::Allowlist => self.cmd_allowlist(arg),
-            Cmd::Provider => self.cmd_provider(),
+            Cmd::Provider => self.cmd_provider(arg),
             Cmd::Profile => self.cmd_profile(arg),
-            Cmd::Login => self.cmd_login(),
-            Cmd::Logout => self.cmd_logout(),
+            Cmd::Login => self.cmd_login(arg),
+            Cmd::Logout => self.cmd_logout(arg),
             Cmd::Stats => self.cmd_stats(),
             Cmd::Status => self.cmd_status(),
             Cmd::Settings => self.cmd_settings(arg),
@@ -83,13 +84,16 @@ impl Tui {
 
     pub fn on_pick(&mut self, kind: PickKind, item: PickItem) {
         match kind {
-            PickKind::Model => self.cmd_model(&item.value),
+            PickKind::Model => self.pick_model(&item.value),
             PickKind::Effort => self.cmd_effort(&item.value),
             PickKind::Permissions => self.cmd_permissions(&item.value),
             PickKind::Resume => self.load_session(PathBuf::from(&item.value)),
             PickKind::Fork => self.fork_at(item.value.parse().unwrap_or(0)),
             PickKind::Provider => self.pick_provider(&item.value),
-            PickKind::Profile => self.cmd_profile(&item.value),
+            PickKind::ProviderAction => self.provider_action(&item.value),
+            PickKind::Profile => self.pick_profile(&item.value),
+            PickKind::ProfileRemove => self.remove_profile(&item.value),
+            PickKind::Help => self.help_picked(&item.value),
             PickKind::ProviderKind => self.provider_kind_picked(&item.value),
             PickKind::CatalogMatch => self.catalog_match_picked(&item.value),
             PickKind::Settings => self.pick_setting(&item.value),

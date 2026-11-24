@@ -119,6 +119,10 @@ fn parse_effort(v: &Value) -> Option<Effort> {
     Effort::parse(v.as_str()?)
 }
 
+/// The ChatGPT backend hides models newer than the client version it is told. A real version goes
+/// stale with every Codex release, so ask with one that is never too old.
+const CLIENT_VERSION: &str = "99.0.0";
+
 impl Provider for Responses {
     fn name(&self) -> &str {
         &self.ep.name
@@ -229,7 +233,9 @@ impl Provider for Responses {
         headers.push(("Accept".into(), "application/json".into()));
         let v = get_json(
             &quick,
-            &self.ep.url("/models?client_version=0.165.0"),
+            &self
+                .ep
+                .url(&format!("/models?client_version={CLIENT_VERSION}")),
             &headers,
         )?;
         let mut models: Vec<(i64, ModelInfo)> = v["models"]

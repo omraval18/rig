@@ -47,6 +47,7 @@ impl Tui {
             KeyCode::PageDown => self.display.transcript.scroll_by(-page, view_rows),
             KeyCode::End if self.prompt.composer.is_empty() => self.display.transcript.scroll = 0,
             KeyCode::Char('p') if ctrl => self.open_model_picker(),
+            KeyCode::Char('o') if ctrl => self.open_profile_picker(""),
             KeyCode::Char('v') if ctrl => self.paste_clipboard_image(),
             KeyCode::BackTab => self.cycle_permissions(),
             KeyCode::Esc => self.on_escape(),
@@ -224,6 +225,15 @@ impl Tui {
             KeyCode::Esc => self.prompt.picker = None,
             KeyCode::Up => p.nav(-1),
             KeyCode::Down | KeyCode::Tab => p.nav(1),
+            KeyCode::Left => p.nav_group(false),
+            KeyCode::Right => p.nav_group(true),
+            KeyCode::Char('u') if ctrl => p.set_filter(""),
+            KeyCode::Char('r') if ctrl && p.kind == PickKind::Model => {
+                let scope = p.scope.clone();
+                let mut specs = self.connected_specs();
+                specs.retain(|s| scope.as_ref().is_none_or(|n| *n == s.name));
+                self.refresh_models(specs, true);
+            }
             KeyCode::Char('p') if ctrl => p.nav(-1),
             KeyCode::Char('n') if ctrl => p.nav(1),
             KeyCode::Backspace => p.backspace(),

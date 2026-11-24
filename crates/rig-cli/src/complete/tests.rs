@@ -111,25 +111,15 @@ fn builds_file_slash_skill_and_arg_candidates() {
         )
         .unwrap(),
     ];
-    let models = vec![
-        ModelInfo {
-            id: "gpt-6-sol".into(),
-            display_name: "GPT-6 Sol".into(),
-            ..Default::default()
-        },
-        ModelInfo {
-            id: "gpt-6-luna".into(),
-            display_name: "GPT-6 Luna".into(),
-            hidden: true,
-            ..Default::default()
-        },
+    let choices = vec![
+        PickItem::labeled("chatgpt/gpt-6-sol").current(true),
+        PickItem::labeled("xai/grok-4.7"),
     ];
     let src = Sources {
         index: &idx,
         skills: &skills,
-        models: &models,
+        choices: &choices,
         efforts: &[Effort::Low, Effort::High],
-        current_model: "gpt-6-sol",
     };
 
     let files = build(
@@ -210,7 +200,7 @@ fn builds_file_slash_skill_and_arg_candidates() {
         7,
         &src,
     );
-    assert_eq!(m.items.len(), 1, "hidden models are not suggested");
+    assert_eq!(m.items.len(), 2, "every provider's models are suggested");
     assert!(m.items[0].detail.contains("current"));
     let e = build(
         Trigger::Arg {

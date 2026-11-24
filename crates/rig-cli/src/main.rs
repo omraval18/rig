@@ -9,8 +9,10 @@ mod desktop;
 mod entry;
 mod keys;
 mod markdown;
+mod models;
 mod picker;
 mod plain;
+mod probe;
 mod profile;
 mod providers;
 mod question;
@@ -58,7 +60,7 @@ struct Opts {
     #[arg(long, global = true, value_name = "ID")]
     resume: Option<String>,
     /// Use this profile for this run (its own logins, keys and settings); see `rig profile`
-    #[arg(long, global = true, value_name = "NAME")]
+    #[arg(short = 'p', long, global = true, value_name = "NAME")]
     profile: Option<String>,
 }
 
@@ -72,7 +74,7 @@ enum Cmd {
         #[arg(long)]
         json: bool,
     },
-    /// Sign in with a ChatGPT subscription: rig login codex (into the active profile)
+    /// Sign in to the active profile: ChatGPT by default, or `rig login anthropic` for an API key
     Login {
         #[arg(default_value = "codex")]
         provider: String,
@@ -80,8 +82,10 @@ enum Cmd {
     /// Remove the active profile's ChatGPT credentials
     Logout,
     /// Manage profiles: separate logins, API keys and settings
-    #[command(subcommand)]
-    Profile(ProfileCmd),
+    Profile {
+        #[command(subcommand)]
+        cmd: Option<ProfileCmd>,
+    },
     /// Save API keys in the active profile (they beat environment variables)
     #[command(subcommand)]
     Key(KeyCmd),
@@ -101,8 +105,16 @@ enum Cmd {
         #[arg(long)]
         rollback: bool,
     },
+    /// List the models of every connected provider, as provider/model
+    Models {
+        /// Only those containing every one of these words
+        query: Vec<String>,
+        /// Ask the providers again even if the lists are recent
+        #[arg(long)]
+        refresh: bool,
+    },
     /// List providers, default models and credential status
-    Models,
+    Providers,
     /// Check the local setup
     Doctor,
 }
@@ -115,6 +127,9 @@ pub enum ProfileCmd {
     /// Create a profile
     Create {
         name: String,
+        /// Copy keys, added providers and settings from this profile (not the ChatGPT login)
+        #[arg(long, value_name = "PROFILE")]
+        from: Option<String>,
         /// Switch to it as well
         #[arg(long = "use")]
         switch: bool,
@@ -167,7 +182,8 @@ fn main() {
         cli.opts.auto = default_autonomy(std::env::args_os().next().as_deref()).map(String::from);
     }
     // Profile management must work even when the profile in use is broken or missing.
-    if let Some(Cmd::Profile(cmd)) = &cli.cmd {
+    if let Some(Cmd::Profile { cmd }) = &cli.cmd {
+        let cmd = cmd.as_ref().unwrap_or(&ProfileCmd::List);
         std::process::exit(subcommands::profile(cmd, cli.opts.profile.as_deref()));
     }
     let (base, _) = config::Paths::base();
@@ -219,12 +235,13 @@ fn main() {
     let code = match cli.cmd {
         None => tui::run(app, opts),
         Some(Cmd::Ask { prompt, json }) => subcommands::ask(&app, &opts, &prompt, json),
-        Some(Cmd::Login { provider }) => subcommands::login(&app, &provider),
+        Some(Cmd::Login { provider }) => subcommands::login(app, &provider),
         Some(Cmd::Logout) => subcommands::logout(&app),
-        Some(Cmd::Models) => subcommands::models(&app),
+        Some(Cmd::Models { query, refresh }) => subcommands::models(&app, &query, refresh),
+        Some(Cmd::Providers) => subcommands::providers(&app),
         Some(Cmd::Doctor) => subcommands::doctor(&app, opts.model.as_deref()),
         Some(Cmd::Key(cmd)) => subcommands::key(app, &cmd),
-        Some(Cmd::Profile(_)) => 0,
+        Some(Cmd::Profile { .. }) => 0,
         Some(Cmd::Update { .. }) => unreachable!("handled before the app starts"),
     };
     std::process::exit(code);
