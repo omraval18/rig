@@ -13,12 +13,12 @@ fn prefix_ranks_first() {
     let names: Vec<_> = complete("mo").iter().map(|c| c.spec.name).collect();
     assert_eq!(names[0], "model");
     let names: Vec<_> = complete("co").iter().map(|c| c.spec.name).collect();
-    let mut top = names[..2].to_vec();
+    let mut top = names[..3].to_vec();
     top.sort();
     assert_eq!(
         top,
-        ["compact", "copy"],
-        "both prefix matches outrank everything else"
+        ["compact", "copy", "provider"],
+        "prefix matches (connect is /provider) outrank everything else"
     );
 }
 
@@ -38,4 +38,12 @@ fn every_command_name_is_unique() {
     names.sort();
     names.dedup();
     assert_eq!(n, names.len());
+}
+
+#[test]
+fn a_typo_suggests_the_command_meant() {
+    assert_eq!(suggest("/modle").unwrap().cmd, Cmd::Model);
+    assert_eq!(suggest("profil").unwrap().cmd, Cmd::Profile);
+    assert_eq!(suggest("conect").unwrap().cmd, Cmd::Provider);
+    assert!(suggest("xyzzy").is_none() && suggest("z").is_none());
 }

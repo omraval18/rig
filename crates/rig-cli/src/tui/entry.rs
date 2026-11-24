@@ -1,22 +1,20 @@
 //! The text box over the composer: typing an API key, or naming a new profile.
 
 use super::Tui;
+use crate::app::App;
 use crate::catalog;
 use crate::entry::{Entry, Purpose};
 use crate::picker::{PickItem, PickKind};
+use crate::probe;
 use crate::profile;
+use crate::runtime::Ev;
+use crate::slash::provider::connectable;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use rig_core::provider::ModelInfo;
 use rig_provider::{Kind, ProviderSpec};
 
-/// A base URL on this machine may be plain http and may have no key.
-fn is_local(url: &str) -> bool {
-    ["http://localhost", "http://127.0.0.1", "http://[::1]"]
-        .iter()
-        .any(|p| url.starts_with(p))
-}
-
 impl Tui {
-    /// Ask for a provider's API key. Enter saves it in the active profile and switches to the provider.
+    /// Ask for a provider's API key. Enter saves it in the active profile and lists the models.
     pub(crate) fn open_key_entry(&mut self, provider: &str) {
         let profile = self.app.paths.profile.clone();
         self.open_entry(Entry {
@@ -41,32 +39,97 @@ impl Tui {
         });
     }
 
-    /// Start adding a provider: first its name, then the API style, the URL, the key and the model.
+    /// Add an endpoint by URL. Its key is asked next; the API style, models and name are found out.
     pub(crate) fn open_provider_entry(&mut self) {
         self.open_entry(Entry {
-            purpose: Purpose::ProviderName,
-            title: "Name for the new provider".into(),
-            hint: "letters, digits, '-' and '_'; it is what you will type after the slash".into(),
+            purpose: Purpose::ProviderUrl,
+            title: "Base URL of the API".into(),
+            hint: "such as https://api.example.com/v1 or http://localhost:8000".into(),
             value: String::new(),
             secret: false,
         });
     }
 
-    /// The API style was picked; the value is `kind|name`.
-    pub(crate) fn provider_kind_picked(&mut self, value: &str) {
-        let Some((kind, name)) = value.split_once('|') else {
-            return;
-        };
+    /// Fill in the open box and move on, as if it had been typed.
+    pub(crate) fn give_entry(&mut self, value: &str) {
+        if let Some(e) = self.prompt.entry.as_mut() {
+            e.value = value.to_string();
+        }
+        self.finish_entry();
+    }
+
+    /// Connect a provider from models.dev: at once when its key is in the environment.
+    pub(crate) fn connect_listed(&mut self, name: &str) {
+        if let Err(e) = self.start_listed(name, None) {
+            self.error(&e);
+        }
+    }
+
+    fn start_listed(&mut self, name: &str, model: Option<&str>) -> Result<(), String> {
+        let cat = catalog::ensure(&self.app.paths.base)?;
+        let (p, _, _) = connectable(&cat, name)
+            .ok_or_else(|| format!("rig does not speak the API of {name} yet"))?;
+        let set = |v: &&String| App::getenv(v).is_some_and(|k| !k.trim().is_empty());
+        if p.env.iter().any(|v| set(&v)) {
+            return self.save_listed(name, "", model);
+        }
         self.open_entry(Entry {
-            purpose: Purpose::ProviderUrl {
+            purpose: Purpose::ListedKey {
                 name: name.into(),
-                kind: kind.into(),
+                model: model.map(String::from),
             },
-            title: format!("Base URL for {name}"),
-            hint: "the API root, such as https://api.example.com/v1 (no /chat/completions)".into(),
+            title: format!("API key for {}", p.name),
+            hint: "stored in keys.json, only you can read it".into(),
             value: String::new(),
-            secret: false,
+            secret: true,
         });
+        Ok(())
+    }
+
+    fn save_listed(&mut self, name: &str, key: &str, model: Option<&str>) -> Result<(), String> {
+        let cat = catalog::ensure(&self.app.paths.base)?;
+        let (p, kind, url) =
+            connectable(&cat, name).ok_or_else(|| format!("{name} is no longer listed"))?;
+        let kind = if kind == "anthropic" {
+            Kind::Anthropic
+        } else {
+            Kind::Chat
+        };
+        let set = |v: &&String| App::getenv(v).is_some_and(|k| !k.trim().is_empty());
+        let env = p.env.iter().find(|v| set(v)).or(p.env.first()).cloned();
+        if key.is_empty() && !env.iter().any(|v| set(&v)) {
+            return Err("no key entered; nothing saved".into());
+        }
+        let spec = ProviderSpec {
+            api_key_env: env,
+            keyless: false,
+            default_model: model.map(String::from),
+            catalog_id: Some(name.into()),
+            ..probe::spec(name, kind, &url, key)
+        };
+        self.add_provider(spec, key)?;
+        match model {
+            Some(model) => self.switch_model(name, model)?,
+            None => self.connected(name),
+        }
+        Ok(())
+    }
+
+    /// Save a provider, and its key if it has one.
+    fn add_provider(&mut self, spec: ProviderSpec, key: &str) -> Result<(), String> {
+        profile::validate(&spec.name)?;
+        let name = spec.name.clone();
+        crate::providers::save(&self.app.paths.providers_file(), &spec)?;
+        self.app.cfg.providers.insert(name.clone(), spec);
+        if !key.is_empty() {
+            self.app.keys.set(&name, key);
+            self.app.keys.save(&self.app.paths.keys_file())?;
+        }
+        self.say(&format!(
+            "Connected {name} in profile '{}'.",
+            self.app.paths.profile
+        ));
+        Ok(())
     }
 
     pub(crate) fn open_catalog_search(&mut self) {
@@ -126,39 +189,11 @@ impl Tui {
             }
             return;
         }
-        let result = (|| -> Result<(), String> {
-            let cat = catalog::ensure(&self.app.paths.base)?;
-            let p = cat
-                .providers
-                .get(provider)
-                .ok_or("that provider is no longer listed")?;
-            let npm = p.npm.as_deref().unwrap_or("");
-            let kind = catalog::kind_for(npm)
-                .ok_or_else(|| format!("{provider} uses an API style rig does not speak yet"))?;
-            let url =
-                catalog::base_url(p, kind).ok_or("the catalog has no URL for this provider")?;
-            if self.app.cfg.providers.contains_key(provider) {
-                return Err(format!(
-                    "'{provider}' is already a provider; pick it from /provider"
-                ));
+        if self.app.cfg.providers.contains_key(provider) {
+            if let Err(e) = self.switch_model(provider, model) {
+                self.error(&e);
             }
-            profile::validate(provider)?;
-            self.open_entry(Entry {
-                purpose: Purpose::ProviderKey {
-                    name: provider.into(),
-                    kind: kind.into(),
-                    url,
-                    model: Some(model.into()),
-                    catalog: Some(provider.into()),
-                },
-                title: format!("API key for {provider} ({model})"),
-                hint: "stored in keys.json, only you can read it".into(),
-                value: String::new(),
-                secret: true,
-            });
-            Ok(())
-        })();
-        if let Err(e) = result {
+        } else if let Err(e) = self.start_listed(provider, Some(model)) {
             self.error(&e);
         }
     }
@@ -203,28 +238,13 @@ impl Tui {
         let value = entry.value.trim().to_string();
         let result = match &entry.purpose {
             Purpose::ApiKey { provider } => self.save_key(provider, &value),
-            Purpose::NewProfile => self.create_profile(&value),
-            Purpose::ProviderName => self.provider_name_given(&value),
-            Purpose::ProviderUrl { name, kind } => self.provider_url_given(name, kind, &value),
-            Purpose::ProviderKey {
-                name,
-                kind,
-                url,
-                model,
-                catalog,
-            } => match model {
-                // Picked from models.dev: the model is already known, so the key saves it.
-                Some(model) => {
-                    self.save_provider(name, kind, url, &value, model, catalog.as_deref())
-                }
-                None => self.provider_key_given(name, kind, url, &value),
-            },
-            Purpose::ProviderModel {
-                name,
-                kind,
-                url,
-                key,
-            } => self.save_provider(name, kind, url, key, &value, None),
+            Purpose::NewProfile => self.create_profile(&value, None),
+            Purpose::ProviderUrl => self.provider_url_given(&value),
+            Purpose::ProviderKey { url } => self.provider_key_given(url, &value),
+            Purpose::ListedKey { name, model } => self.save_listed(name, &value, model.as_deref()),
+            Purpose::ProviderModel { kind, url, key } => {
+                self.provider_model_given(*kind, url, key, &value)
+            }
             Purpose::CatalogSearch => self.catalog_search_given(&value),
         };
         if let Err(e) = result {
@@ -238,135 +258,123 @@ impl Tui {
         if key.is_empty() {
             return Err("no key entered; nothing saved".into());
         }
-        let spec = self.app.provider_spec(provider)?;
-        let model = self
-            .app
-            .default_model_of(&spec)
-            .ok_or_else(|| format!("no default model for {provider}; pick one with /model"))?;
+        self.app.provider_spec(provider)?;
         self.app.keys.set(provider, key);
         self.app.keys.save(&self.app.paths.keys_file())?;
-        self.switch_model(provider, &model)?;
         self.say(&format!(
-            "Saved the {provider} key in profile '{}' and switched to {provider}/{model}.",
+            "Saved the {provider} key in profile '{}'.",
             self.app.paths.profile
         ));
+        self.connected(provider);
         Ok(())
     }
 
-    /// Save a provider the user added, its key, and switch to it with the model they gave.
-    fn save_provider(
-        &mut self,
-        name: &str,
-        kind: &str,
-        url: &str,
-        key: &str,
-        model: &str,
-        catalog_id: Option<&str>,
-    ) -> Result<(), String> {
-        profile::validate(name)?;
-        let spec = ProviderSpec {
-            name: name.into(),
-            kind: if kind == "anthropic" {
-                Kind::Anthropic
-            } else {
-                Kind::Chat
-            },
-            base_url: url.trim_end_matches('/').into(),
-            api_key_env: None,
-            api_key: None,
-            chatgpt_plan: false,
-            keyless: key.is_empty(),
-            web_search: false,
-            default_model: Some(model.into()),
-            catalog_id: catalog_id.map(String::from),
-            subscription: false,
-            routes: Vec::new(),
-        };
-        crate::providers::save(&self.app.paths.providers_file(), &spec)?;
-        self.app.cfg.providers.insert(name.into(), spec);
-        if !key.is_empty() {
-            self.app.keys.set(name, key);
-            self.app.keys.save(&self.app.paths.keys_file())?;
-        }
-        self.switch_model(name, model)?;
-        self.say(&format!("Added {name} and switched to {name}/{model}."));
-        Ok(())
-    }
-
-    fn provider_name_given(&mut self, name: &str) -> Result<(), String> {
-        profile::validate(name)?;
-        if self.app.cfg.providers.contains_key(name) {
-            return Err(format!("'{name}' is already a provider; pick another name"));
-        }
-        self.open_picker(
-            PickKind::ProviderKind,
-            &format!("API style for {name}"),
-            vec![
-                PickItem::new("OpenAI-compatible", format!("chat|{name}"))
-                    .detail("chat completions, such as DeepSeek, Z.ai, Kimi, Ollama"),
-                PickItem::new("Anthropic-compatible", format!("anthropic|{name}"))
-                    .detail("messages API, such as MiniMax's Anthropic endpoint"),
-            ],
-        );
-        Ok(())
-    }
-
-    fn provider_url_given(&mut self, name: &str, kind: &str, url: &str) -> Result<(), String> {
-        let url = url.trim();
-        let web = url.starts_with("https://") && url.len() > "https://".len();
-        if !(web || (url.starts_with("http://") && is_local(url))) {
-            return Err(
-                "the base URL must start with https:// (http:// only for this machine)".into(),
-            );
-        }
+    fn provider_url_given(&mut self, typed: &str) -> Result<(), String> {
+        let url = probe::clean_url(typed)?;
         self.open_entry(Entry {
-            purpose: Purpose::ProviderKey {
-                name: name.into(),
-                kind: kind.into(),
-                url: url.into(),
-                model: None,
-                catalog: None,
-            },
-            title: format!("API key for {name}"),
-            hint:
-                "stored in keys.json, only you can read it; leave empty for a server without a key"
-                    .into(),
+            title: format!("API key for {url}"),
+            purpose: Purpose::ProviderKey { url },
+            hint: "stored in keys.json, only you can read it; empty for a local server".into(),
             value: String::new(),
             secret: true,
         });
         Ok(())
     }
 
-    fn provider_key_given(
-        &mut self,
-        name: &str,
-        kind: &str,
-        url: &str,
-        key: &str,
-    ) -> Result<(), String> {
-        if key.is_empty() && !is_local(url) {
+    fn provider_key_given(&mut self, url: &str, key: &str) -> Result<(), String> {
+        if key.is_empty() && !probe::is_local(url) {
             return Err("this server needs a key; type it, or use a local URL".into());
         }
-        self.open_entry(Entry {
-            purpose: Purpose::ProviderModel {
-                name: name.into(),
-                kind: kind.into(),
-                url: url.into(),
-                key: key.into(),
-            },
-            title: format!("Model ID for {name}"),
-            hint: "exactly as the provider names it, such as gpt-6-sol or deepseek-v4-flash".into(),
-            value: String::new(),
-            secret: false,
+        self.say(&format!("Checking {url}…"));
+        let (url, key, tx) = (url.to_string(), key.to_string(), self.tx.clone());
+        std::thread::spawn(move || {
+            let result = probe::probe(&url, &key);
+            let _ = tx.send(Ev::Probed { url, key, result });
         });
         Ok(())
     }
 
-    fn create_profile(&mut self, name: &str) -> Result<(), String> {
-        let base = self.app.paths.base.clone();
-        profile::create(&base, name)?;
-        // Switching restarts rig in the new profile, where its keys and logins are set up.
-        self.cmd_profile(name);
-        Ok(())
+    fn new_provider_name(&self, url: &str) -> String {
+        probe::name_for(url, |n| self.app.provider_spec(n).is_ok())
+    }
+
+    /// The endpoint answered: save it and choose a model. Otherwise ask what it is.
+    pub(super) fn endpoint_probed(
+        &mut self,
+        url: &str,
+        key: &str,
+        result: Result<(Kind, String, Vec<ModelInfo>), String>,
+    ) {
+        match result {
+            Ok((kind, base, models)) => {
+                let name = self.new_provider_name(&base);
+                let spec = probe::spec(&name, kind, &base, key);
+                if let Err(e) = self.add_provider(spec.clone(), key) {
+                    return self.error(&e);
+                }
+                let seq = self.models.begin(&spec);
+                self.on_models(&name, seq, Ok(models));
+                if self.prompt.is_free() {
+                    self.open_model_picker_for(&name);
+                }
+            }
+            Err(e) => {
+                self.error(&format!("{url}: {e}"));
+                if !self.prompt.is_free() {
+                    return;
+                }
+                self.prompt.endpoint = Some((url.into(), key.into()));
+                self.open_picker(
+                    PickKind::ProviderKind,
+                    "Add it anyway? Choose its API style",
+                    vec![
+                        PickItem::new("OpenAI-compatible", "chat").detail("chat completions"),
+                        PickItem::new("Anthropic-compatible", "anthropic").detail("messages API"),
+                    ],
+                );
+            }
+        }
+    }
+
+    pub(crate) fn provider_kind_picked(&mut self, kind: &str) {
+        let Some((url, key)) = self.prompt.endpoint.take() else {
+            return;
+        };
+        let kind = if kind == "anthropic" {
+            Kind::Anthropic
+        } else {
+            Kind::Chat
+        };
+        self.open_entry(Entry {
+            title: format!("Model ID on {url}"),
+            purpose: Purpose::ProviderModel { kind, url, key },
+            hint: "exactly as the provider names it".into(),
+            value: String::new(),
+            secret: false,
+        });
+    }
+
+    fn provider_model_given(
+        &mut self,
+        kind: Kind,
+        url: &str,
+        key: &str,
+        model: &str,
+    ) -> Result<(), String> {
+        if model.is_empty() {
+            return Err("type the model's ID".into());
+        }
+        let base = match kind {
+            // The Anthropic adapter adds /v1 itself.
+            Kind::Anthropic => url.strip_suffix("/v1").unwrap_or(url),
+            _ => url,
+        };
+        let name = self.new_provider_name(base);
+        let spec = ProviderSpec {
+            default_model: Some(model.into()),
+            ..probe::spec(&name, kind, base, key)
+        };
+        self.add_provider(spec, key)?;
+        self.switch_model(&name, model)
     }
 }

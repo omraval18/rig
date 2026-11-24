@@ -30,8 +30,8 @@ Releases are built, signed and published by `.github/workflows/release.yml` when
 2. Tag the merge commit and push the tag:
 
    ```bash
-   git tag -a v0.4.0 -m "rig 0.4.0"
-   git push origin v0.4.0
+   git tag -a v0.4.1 -m "rig 0.4.1"
+   git push origin v0.4.1
    ```
 
 3. The workflow checks that the tag matches the crate version, builds, writes `SHA256SUMS`, signs it, checks the signature against `minisign.pub`, and only then uploads the archives and signatures to the GitHub release.

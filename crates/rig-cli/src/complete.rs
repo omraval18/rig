@@ -3,10 +3,11 @@
 //! `detect` looks at the text and cursor and says what is being completed; `build`
 //! produces ranked candidates. Both are pure so they can be tested without a terminal.
 
+use crate::picker::PickItem;
 use rig_core::commands::{self, Cmd};
 use rig_core::fuzzy::rank_label;
 use rig_core::permission::Autonomy;
-use rig_core::provider::{Effort, ModelInfo};
+use rig_core::provider::Effort;
 use rig_core::skills::Skill;
 use rig_tools::index::Index;
 
@@ -79,15 +80,22 @@ fn starts_token(prev: Option<char>) -> bool {
 
 /// Commands whose argument has completions.
 fn takes_arg_completion(c: Cmd) -> bool {
-    matches!(c, Cmd::Model | Cmd::Effort | Cmd::Permissions | Cmd::Skills)
+    runs_bare(c) && c != Cmd::Settings || c == Cmd::Skills
 }
 
-/// Commands that open their own filterable picker when run bare. They get no second popup for an
+/// Commands that do something useful with no argument, usually opening their own picker. They get no second popup for an
 /// empty argument: one selector at a time.
-fn opens_picker(c: Cmd) -> bool {
+pub fn runs_bare(c: Cmd) -> bool {
     matches!(
         c,
-        Cmd::Model | Cmd::Effort | Cmd::Permissions | Cmd::Settings | Cmd::Profile
+        Cmd::Model
+            | Cmd::Effort
+            | Cmd::Permissions
+            | Cmd::Settings
+            | Cmd::Profile
+            | Cmd::Provider
+            | Cmd::Login
+            | Cmd::Logout
     )
 }
 
@@ -109,7 +117,7 @@ pub fn detect(text: &[char], cursor: usize) -> Option<Trigger> {
                         .collect::<String>()
                         .trim_start()
                         .to_string();
-                    if query.is_empty() && opens_picker(spec.cmd) {
+                    if query.is_empty() && runs_bare(spec.cmd) {
                         return None;
                     }
                     return Some(Trigger::Arg {
@@ -144,9 +152,9 @@ pub fn detect(text: &[char], cursor: usize) -> Option<Trigger> {
 pub struct Sources<'a> {
     pub index: &'a Index,
     pub skills: &'a [Skill],
-    pub models: &'a [ModelInfo],
+    /// Candidates for the argument being completed (models, profiles, providers).
+    pub choices: &'a [PickItem],
     pub efforts: &'a [Effort],
-    pub current_model: &'a str,
 }
 
 fn quote_if_needed(path: &str) -> String {
@@ -171,7 +179,7 @@ pub fn build(trigger: Trigger, cursor: usize, src: &Sources) -> Completion {
                     insert: format!("/{}{}", c.spec.name, if c.spec.has_args { " " } else { "" }),
                     positions: c.m.positions.iter().map(|p| p + 1).collect(),
                     kind: Kind::Command,
-                    complete_command: !c.spec.has_args || opens_picker(c.spec.cmd),
+                    complete_command: !c.spec.has_args || runs_bare(c.spec.cmd),
                 })
                 .collect();
             (items, (0, cursor), false)
@@ -251,18 +259,14 @@ fn arg_items(cmd: Cmd, query: &str, src: &Sources) -> Vec<Item> {
         }
     };
     match cmd {
-        Cmd::Model => {
-            for m in src.models.iter().filter(|m| !m.hidden) {
-                let cur = if m.id == src.current_model {
-                    "  (current)"
-                } else {
-                    ""
-                };
+        Cmd::Model | Cmd::Profile | Cmd::Provider | Cmd::Login | Cmd::Logout => {
+            for c in src.choices {
+                let cur = if c.current { "  (current)" } else { "" };
                 add(
-                    m.id.clone(),
-                    format!("{}{cur}", m.display_name),
-                    m.id.clone(),
-                    &m.id,
+                    c.label.clone(),
+                    format!("{}{cur}", c.detail),
+                    c.value.clone(),
+                    &c.label,
                 );
             }
         }

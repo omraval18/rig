@@ -13,7 +13,8 @@ pub struct ToolSpec {
     pub parameters: Value,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Effort {
     Low,
     Medium,
@@ -129,6 +130,18 @@ pub enum ProviderError {
 }
 
 impl ProviderError {
+    /// The server refused the credentials.
+    pub fn is_rejected(&self) -> bool {
+        matches!(
+            self,
+            ProviderError::Auth(_)
+                | ProviderError::Http {
+                    status: 401 | 403,
+                    ..
+                }
+        )
+    }
+
     pub fn is_retryable(&self) -> bool {
         match self {
             ProviderError::Network(_) => true,
@@ -178,7 +191,8 @@ impl fmt::Display for ProviderError {
 impl std::error::Error for ProviderError {}
 
 /// What a provider says about one of its models.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
 pub struct ModelInfo {
     pub id: String,
     pub display_name: String,

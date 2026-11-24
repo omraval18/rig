@@ -44,12 +44,20 @@ pub enum Category {
 }
 
 impl Category {
+    pub const ALL: [Category; 5] = [
+        Category::Model,
+        Category::Account,
+        Category::Session,
+        Category::Extensions,
+        Category::General,
+    ];
+
     pub fn title(self) -> &'static str {
         match self {
             Category::General => "General",
             Category::Session => "Session",
-            Category::Model => "Model",
-            Category::Account => "Account",
+            Category::Model => "Model & permissions",
+            Category::Account => "Providers & profiles",
             Category::Extensions => "Extensions",
         }
     }
@@ -88,12 +96,31 @@ const fn spec(
 
 pub static COMMANDS: &[Spec] = &[
     spec(
-        Cmd::Help,
-        "help",
-        "/help",
-        "show available slash commands",
-        Category::General,
-        false,
+        Cmd::Model,
+        "model",
+        "/model [query | provider/model | -]",
+        "choose from every connected provider (Ctrl+P); - goes back",
+        Category::Model,
+        true,
+    ),
+    Spec {
+        aliases: &["connect", "setup"],
+        ..spec(
+            Cmd::Provider,
+            "provider",
+            "/provider [name] (/connect)",
+            "connect and manage providers: sign in, add a key, add an endpoint",
+            Category::Account,
+            true,
+        )
+    },
+    spec(
+        Cmd::Profile,
+        "profile",
+        "/profile [name | new <name> | remove <name>]",
+        "switch, create or remove profiles (Ctrl+O)",
+        Category::Account,
+        true,
     ),
     Spec {
         aliases: &["clear"],
@@ -115,21 +142,32 @@ pub static COMMANDS: &[Spec] = &[
         false,
     ),
     spec(
-        Cmd::Rename,
-        "rename",
-        "/rename <title>",
-        "rename the current session",
-        Category::Session,
+        Cmd::Effort,
+        "effort",
+        "/effort [level]",
+        "choose the reasoning effort",
+        Category::Model,
         true,
     ),
     spec(
-        Cmd::Fork,
-        "fork",
-        "/fork",
-        "fork the session before an earlier prompt",
-        Category::Session,
-        false,
+        Cmd::Permissions,
+        "permissions",
+        "/permissions [level]",
+        "choose what rig may do without asking",
+        Category::Model,
+        true,
     ),
+    Spec {
+        aliases: &["refresh-models"],
+        ..spec(
+            Cmd::RefreshModels,
+            "refresh",
+            "/refresh",
+            "get the latest models from every connected provider, and prices",
+            Category::Model,
+            false,
+        )
+    },
     spec(
         Cmd::Compact,
         "compact",
@@ -147,10 +185,10 @@ pub static COMMANDS: &[Spec] = &[
         false,
     ),
     spec(
-        Cmd::Paste,
-        "paste",
-        "/paste",
-        "attach the image on your clipboard (or press Ctrl+V)",
+        Cmd::Fork,
+        "fork",
+        "/fork",
+        "fork the session before an earlier prompt",
         Category::Session,
         false,
     ),
@@ -163,20 +201,12 @@ pub static COMMANDS: &[Spec] = &[
         false,
     ),
     spec(
-        Cmd::Model,
-        "model",
-        "/model [id-or-query]",
-        "choose the model",
-        Category::Model,
-        true,
-    ),
-    spec(
-        Cmd::Effort,
-        "effort",
-        "/effort [level]",
-        "choose the reasoning effort",
-        Category::Model,
-        true,
+        Cmd::Paste,
+        "paste",
+        "/paste",
+        "attach the image on your clipboard (or press Ctrl+V)",
+        Category::Session,
+        false,
     ),
     Spec {
         aliases: &["goal"],
@@ -190,22 +220,6 @@ pub static COMMANDS: &[Spec] = &[
         )
     },
     spec(
-        Cmd::RefreshModels,
-        "refresh-models",
-        "/refresh-models",
-        "download the latest providers and models (and their prices)",
-        Category::Account,
-        false,
-    ),
-    spec(
-        Cmd::Mcp,
-        "mcp",
-        "/mcp",
-        "show the MCP servers and whether they are running",
-        Category::Extensions,
-        false,
-    ),
-    spec(
         Cmd::Summary,
         "summary",
         "/summary",
@@ -214,70 +228,27 @@ pub static COMMANDS: &[Spec] = &[
         false,
     ),
     spec(
-        Cmd::Reasoning,
-        "reasoning",
-        "/reasoning",
-        "show or hide the model's reasoning summary",
-        Category::Model,
-        false,
-    ),
-    spec(
-        Cmd::Permissions,
-        "permissions",
-        "/permissions [level]",
-        "choose what rig may do without asking",
-        Category::Model,
+        Cmd::Rename,
+        "rename",
+        "/rename <title>",
+        "rename the current session",
+        Category::Session,
         true,
     ),
     spec(
-        Cmd::Allowlist,
-        "allowlist",
-        "/allowlist [view|remove <n>|reset]",
-        "manage commands you chose to always allow",
-        Category::Model,
-        true,
-    ),
-    Spec {
-        aliases: &["setup"],
-        ..spec(
-            Cmd::Provider,
-            "provider",
-            "/provider (/setup)",
-            "choose the model provider",
-            Category::Account,
-            false,
-        )
-    },
-    spec(
-        Cmd::Profile,
-        "profile",
-        "/profile [name]",
-        "switch to another profile (its own logins, keys and settings)",
-        Category::Account,
+        Cmd::Skills,
+        "skills",
+        "/skills [list|show|create|path]",
+        "browse skills ($ opens skill search)",
+        Category::Extensions,
         true,
     ),
     spec(
-        Cmd::Login,
-        "login",
-        "/login",
-        "sign in with your ChatGPT subscription",
-        Category::Account,
-        false,
-    ),
-    spec(
-        Cmd::Logout,
-        "logout",
-        "/logout",
-        "sign out of ChatGPT",
-        Category::Account,
-        false,
-    ),
-    spec(
-        Cmd::Stats,
-        "stats",
-        "/stats",
-        "show token and turn statistics",
-        Category::Account,
+        Cmd::Mcp,
+        "mcp",
+        "/mcp",
+        "show the MCP servers and whether they are running",
+        Category::Extensions,
         false,
     ),
     spec(
@@ -289,12 +260,12 @@ pub static COMMANDS: &[Spec] = &[
         false,
     ),
     spec(
-        Cmd::Skills,
-        "skills",
-        "/skills [list|show|create|path]",
-        "browse skills ($ opens skill search)",
-        Category::Extensions,
-        true,
+        Cmd::Stats,
+        "stats",
+        "/stats",
+        "show token and turn statistics",
+        Category::General,
+        false,
     ),
     spec(
         Cmd::Settings,
@@ -303,6 +274,46 @@ pub static COMMANDS: &[Spec] = &[
         "change model, effort, permissions and other defaults",
         Category::General,
         true,
+    ),
+    spec(
+        Cmd::Login,
+        "login",
+        "/login [provider]",
+        "sign in to ChatGPT, or enter a key for another provider",
+        Category::Account,
+        true,
+    ),
+    spec(
+        Cmd::Logout,
+        "logout",
+        "/logout [provider]",
+        "sign out of ChatGPT, or forget a saved key",
+        Category::Account,
+        true,
+    ),
+    spec(
+        Cmd::Reasoning,
+        "reasoning",
+        "/reasoning",
+        "show or hide the model's reasoning summary",
+        Category::Model,
+        false,
+    ),
+    spec(
+        Cmd::Allowlist,
+        "allowlist",
+        "/allowlist [view|remove <n>|reset]",
+        "manage commands you chose to always allow",
+        Category::Model,
+        true,
+    ),
+    spec(
+        Cmd::Help,
+        "help",
+        "/help",
+        "browse commands and keyboard shortcuts",
+        Category::General,
+        false,
     ),
     spec(
         Cmd::Version,
@@ -355,28 +366,36 @@ pub fn complete(query: &str) -> Vec<Completion> {
     out
 }
 
-/// Plain-text help, grouped by category.
-pub fn help_text() -> String {
-    let mut out = String::new();
-    let width = COMMANDS
+/// The command someone probably meant by a mistyped `token`.
+pub fn suggest(token: &str) -> Option<&'static Spec> {
+    let t = token.trim_start_matches('/').to_lowercase();
+    COMMANDS
         .iter()
-        .map(|s| s.usage.chars().count())
-        .max()
-        .unwrap_or(0);
-    for cat in [
-        Category::General,
-        Category::Session,
-        Category::Model,
-        Category::Account,
-        Category::Extensions,
-    ] {
-        out.push_str(&format!("{}\n", cat.title()));
-        for s in COMMANDS.iter().filter(|s| s.category == cat) {
-            out.push_str(&format!("  {:<width$}  {}\n", s.usage, s.summary));
+        .flat_map(|s| {
+            std::iter::once(s.name)
+                .chain(s.aliases.iter().copied())
+                .map(move |n| (s, n))
+        })
+        .map(|(s, n)| (distance(&t, n), s))
+        .filter(|(d, _)| *d <= 2 && *d < t.chars().count())
+        .min_by_key(|(d, _)| *d)
+        .map(|(_, s)| s)
+}
+
+/// Edits (insert, delete, replace) between two short words.
+fn distance(a: &str, b: &str) -> usize {
+    let b: Vec<char> = b.chars().collect();
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.chars().enumerate() {
+        let mut diagonal = row[0];
+        row[0] = i + 1;
+        for (j, cb) in b.iter().enumerate() {
+            let replace = diagonal + usize::from(ca != *cb);
+            diagonal = row[j + 1];
+            row[j + 1] = replace.min(diagonal + 1).min(row[j] + 1);
         }
     }
-    out.push_str("\nType @ to mention a file or folder, $ to use a skill, / for commands.\n");
-    out
+    row[b.len()]
 }
 
 #[cfg(test)]

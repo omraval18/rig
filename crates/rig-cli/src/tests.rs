@@ -18,7 +18,15 @@ fn a_permission_level_named_like_a_subcommand_is_still_a_value() {
 #[test]
 fn subcommands_and_a_first_message_coexist() {
     assert!(matches!(parse(&["ask", "hi"]).cmd, Some(Cmd::Ask { .. })));
-    assert!(matches!(parse(&["models"]).cmd, Some(Cmd::Models)));
+    assert!(matches!(
+        parse(&["models", "sonnet"]).cmd,
+        Some(Cmd::Models { refresh: false, .. })
+    ));
+    assert!(matches!(
+        parse(&["profile"]).cmd,
+        Some(Cmd::Profile { cmd: None })
+    ));
+    assert_eq!(parse(&["-p", "work"]).opts.profile.as_deref(), Some("work"));
     let c = parse(&["--auto", "medium", "--", "-- fix the tests"]);
     assert!(c.cmd.is_none() && c.prompt == ["-- fix the tests"]);
     assert_eq!(

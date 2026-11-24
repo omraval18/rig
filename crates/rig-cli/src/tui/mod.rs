@@ -7,6 +7,7 @@ use crate::app::{App, RunOpts, Started};
 use crate::complete::Completion;
 use crate::composer::Composer;
 use crate::markdown::Styler;
+use crate::models::Models;
 use crate::picker::Picker;
 use crate::runtime::Ev;
 use crate::screen::Screen;
@@ -17,14 +18,14 @@ use crossterm::terminal;
 use rig_core::agent::Agent;
 use rig_core::message::{Message, Role};
 use rig_core::permission::{Approval, Policy};
-use rig_core::provider::{Effort, ModelInfo, Provider, Usage};
+use rig_core::provider::{Effort, Provider, Usage};
 use rig_core::session::Session;
 use rig_core::skills::Skill;
 use rig_core::sync::MutexExt;
 use rig_core::tool::Shared;
 use rig_provider::ProviderSpec;
 use rig_tools::index::Index;
-use std::collections::VecDeque;
+use std::collections::{BTreeSet, VecDeque};
 use std::io::{IsTerminal, Stdout, stdout};
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
@@ -67,7 +68,11 @@ pub struct Tui {
     pub policy: Policy,
     pub index: Index,
     pub skills: Vec<Skill>,
-    pub models: Vec<ModelInfo>,
+    pub models: Models,
+    /// Providers whose refresh was asked for, so its result is said.
+    reporting: BTreeSet<String>,
+    /// A provider just connected, whose models are to be chosen from once they arrive.
+    pub choose_from: Option<String>,
     pub info: Info,
     pub pending: PendingChange,
     pub show_reasoning: bool,
@@ -150,10 +155,15 @@ pub fn run(app: App, opts: RunOpts) -> i32 {
     }));
     let mut tui = Tui::new(app, started);
     tui.banner(resumed);
-    tui.fetch_models();
+    if tui.signed_in() {
+        let spec = tui.info.spec.clone();
+        tui.refresh_models(vec![spec], false);
+    }
     if let Some(first) = first_message {
         tui.prompt.composer.insert_str(&first);
         tui.submit();
+    } else if !tui.signed_in() {
+        tui.open_provider_picker("");
     }
     tui.main_loop();
     let farewell = tui.farewell();
@@ -173,8 +183,11 @@ pub fn run(app: App, opts: RunOpts) -> i32 {
 fn restart_in_profile(name: &str) -> i32 {
     use std::os::unix::process::CommandExt;
     println!("Switching to profile '{name}'…");
+    // Keep the name rig was started under, so `rigd` stays `rigd`.
+    let argv0 = std::env::args_os().next().unwrap_or_else(|| "rig".into());
     let exe = std::env::current_exe().unwrap_or_else(|_| "rig".into());
     let err = std::process::Command::new(exe)
+        .arg0(argv0)
         .arg("--profile")
         .arg(name)
         .exec();
@@ -238,6 +251,7 @@ impl Tui {
         let stats = Session::usage(&s.session.path, 0, u64::MAX)
             .map(|entries| Stats::from_entries(&entries))
             .unwrap_or_default();
+        let models = Models::load(&app.paths.models_file());
         let mut t = Tui {
             app,
             prompt: Prompt::new(history),
@@ -252,7 +266,9 @@ impl Tui {
             policy,
             index,
             skills: s.skills,
-            models: Vec::new(),
+            models,
+            reporting: BTreeSet::new(),
+            choose_from: None,
             info,
             pending: PendingChange::default(),
             show_reasoning: app_show_reasoning,

@@ -194,20 +194,23 @@ impl Tui {
     }
 
     /// `/refresh-models`: download the catalog in the background; the result is reported when it lands.
+    /// `/refresh`: every connected provider's models, and the models.dev catalog.
     pub(super) fn cmd_refresh_models(&mut self) {
-        self.say("Downloading the latest model list from models.dev…");
+        let specs = self.connected_specs();
+        self.refresh_models(specs, true);
         let base = self.app.paths.base.clone();
         let tx = self.tx.clone();
         std::thread::spawn(move || {
             let msg = match crate::catalog::refresh(&base) {
                 Ok(c) => format!(
-                    "Model list updated: {} providers, {} models.",
+                    "models.dev: {} providers, {} models and their prices.",
                     c.providers.len(),
                     c.providers.values().map(|p| p.models.len()).sum::<usize>()
                 ),
                 Err(e) => e,
             };
             let _ = tx.send(crate::runtime::Ev::Notice(msg));
+            let _ = tx.send(crate::runtime::Ev::Catalog);
         });
     }
 

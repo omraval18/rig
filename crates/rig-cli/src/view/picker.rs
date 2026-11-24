@@ -1,10 +1,12 @@
 //! The filter-as-you-type list that replaces the composer for `/model`, `/resume` and friends.
 
 use super::text::{dim, highlighted, truncate, width_of};
-use crate::complete::MAX_ROWS;
-use crate::picker::{PickItem, PickKind, Picker};
+use crate::picker::{PickItem, PickKind, Picker, Row};
 use crate::style;
 use crate::style::{BOLD, RESET};
+
+/// Lines of the list, headings included. With the panel around it this fits a 24-row window.
+const MAX_ROWS: usize = 14;
 
 /// Rows of the panel, and the cursor, which rests at the end of the filter text.
 pub(super) fn rows(p: &Picker, w: usize, color: bool) -> (Vec<String>, (usize, usize)) {
@@ -16,7 +18,13 @@ pub(super) fn rows(p: &Picker, w: usize, color: bool) -> (Vec<String>, (usize, u
     )];
     let filter_line = truncate(&format!("  filter: {}", p.filter), w);
     let cursor = (1, width_of(&filter_line));
-    lines.push(filter_line);
+    let position = p.position();
+    let gap = w.saturating_sub(width_of(&filter_line) + width_of(&position));
+    lines.push(if gap > 1 {
+        format!("{filter_line}{}{}", " ".repeat(gap), dim(&position, color))
+    } else {
+        filter_line
+    });
 
     let rows = p.rows(MAX_ROWS);
     if rows.is_empty() {
@@ -26,26 +34,35 @@ pub(super) fn rows(p: &Picker, w: usize, color: bool) -> (Vec<String>, (usize, u
     // One detail column for the whole list, so descriptions line up.
     let col = rows
         .iter()
-        .map(|(it, _, _)| {
-            width_of(&truncate(&it.label, label_room)) + if it.current { 2 } else { 0 }
+        .filter_map(|r| match r {
+            Row::Item { item, .. } => Some(
+                width_of(&truncate(&item.label, label_room)) + if item.current { 2 } else { 0 },
+            ),
+            Row::Heading(_) => None,
         })
         .max()
         .unwrap_or(0);
-    for (item, positions, selected) in rows {
-        let line = item_row(
-            p.kind,
-            item,
-            positions,
-            selected,
-            (w, label_room, col),
-            color,
-        );
-        lines.push(line);
+    for row in rows {
+        lines.push(match row {
+            Row::Heading(text) => {
+                let text = truncate(&format!("  {text}"), w);
+                style::paint(color, style::BOLD, &dim(&text, color))
+            }
+            Row::Item {
+                item,
+                positions,
+                selected,
+            } => item_row(
+                p.kind,
+                item,
+                positions,
+                selected,
+                (w, label_room, col),
+                color,
+            ),
+        });
     }
-    lines.push(dim(
-        &truncate("  type to filter · ↑↓ move · Enter select · Esc cancel", w),
-        color,
-    ));
+    lines.push(dim(&truncate(&format!("  {}", p.kind.hint()), w), color));
     (lines, cursor)
 }
 
@@ -69,7 +86,7 @@ fn item_row(
         color,
     );
     let used = width_of(&truncate(&item.label, label_room)) + width_of(current);
-    let gap = " ".repeat(col + 2 - used);
+    let gap = " ".repeat((col + 2).saturating_sub(used));
     let detail_text = format!(
         "{gap}{}",
         truncate(&item.detail, w.saturating_sub(3 + col + 2))

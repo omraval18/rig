@@ -2,7 +2,8 @@
 
 use super::{PendingChange, Tui};
 use crate::runtime::Ev;
-use rig_core::provider::Effort;
+use rig_core::provider::{Effort, ModelInfo};
+use rig_provider::ProviderSpec;
 
 impl Tui {
     pub fn signed_in(&self) -> bool {
@@ -40,15 +41,17 @@ impl Tui {
             provider: Some(provider),
             ..PendingChange::default()
         });
-        self.models.clear();
-        self.fetch_models();
+        self.models.forget(&spec.name);
+        if self.signed_in() {
+            self.refresh_models(vec![spec], false);
+        }
         self.dirty = true;
     }
 
     /// Learn the context window and supported efforts of the current model once the list arrives.
     pub(super) fn apply_model_info(&mut self) {
         let Some(m) = self
-            .models
+            .current_models()
             .iter()
             .find(|m| m.id == self.info.model)
             .cloned()
@@ -64,38 +67,103 @@ impl Tui {
         self.dirty = true;
     }
 
-    pub fn fetch_models(&mut self) {
-        let spec = self.info.spec.clone();
-        if !self.app.has_credentials(&spec) {
-            return;
+    /// The model list of the provider in use, as far as it is known.
+    pub fn current_models(&self) -> &[ModelInfo] {
+        self.models.of(&self.info.spec)
+    }
+
+    pub fn connected_specs(&self) -> Vec<ProviderSpec> {
+        let mut specs = self.app.cfg.providers();
+        specs.retain(|s| self.app.has_credentials(s));
+        specs
+    }
+
+    /// Fetch these providers' model lists in the background. `report` says what came back.
+    pub fn refresh_models(&mut self, specs: Vec<ProviderSpec>, report: bool) {
+        if report {
+            if specs.is_empty() {
+                return self.say("No provider is connected yet: /provider connects one.");
+            }
+            self.notice("refreshing models…");
         }
-        let Ok(provider) = self.app.build_provider(&spec, &self.info.model) else {
+        for spec in specs {
+            let lister = match self.app.model_lister(&spec) {
+                Ok(lister) => lister,
+                Err(e) => {
+                    self.notice(e);
+                    continue;
+                }
+            };
+            if report {
+                self.reporting.insert(spec.name.clone());
+            }
+            let seq = self.models.begin(&spec);
+            let tx = self.tx.clone();
+            std::thread::spawn(move || {
+                let _ = tx.send(Ev::Models {
+                    provider: spec.name,
+                    seq,
+                    models: lister(),
+                });
+            });
+        }
+        self.refresh_model_picker();
+    }
+
+    pub(super) fn on_models(
+        &mut self,
+        provider: &str,
+        seq: u64,
+        models: Result<Vec<ModelInfo>, String>,
+    ) {
+        let Some(result) = self.models.finish(provider, seq, models) else {
             return;
         };
-        // A gateway's own list does not say which API each model needs, so the catalog lists them.
-        let base = self.app.paths.base.clone();
-        let tx = self.tx.clone();
-        std::thread::spawn(move || {
-            let from_catalog = || {
-                let id = spec
-                    .catalog_id
-                    .as_deref()
-                    .filter(|_| !spec.routes.is_empty())?;
-                crate::catalog::models(&crate::catalog::ensure(&base).ok()?, id)
-            };
-            let models = match from_catalog() {
-                Some(models) => Ok(models),
-                None => provider.list_models().map_err(|e| e.to_string()),
-            };
-            let _ = tx.send(Ev::Models {
-                provider: spec.name,
-                models,
-            });
-        });
+        let reported = self.reporting.remove(provider);
+        let choose = self.choose_from.take_if(|p| p == provider).is_some();
+        let spec = self.app.provider_spec(provider).ok();
+        // A local server that has never answered is simply not running.
+        let absent = spec.is_some_and(|s| s.keyless && self.models.of(&s).is_empty());
+        let here = provider == self.info.spec.name;
+        let failed = result.is_err();
+        match result {
+            Ok(update) => {
+                let new = match update.added.as_slice() {
+                    [] => String::new(),
+                    [first, rest @ ..] if rest.len() > 3 => {
+                        format!(" · new: {first} and {} more", rest.len())
+                    }
+                    some => format!(" · new: {}", some.join(", ")),
+                };
+                if reported {
+                    self.say(&format!("{provider}: {} models{new}", update.total));
+                } else if here && !new.is_empty() {
+                    self.notice(format!("{provider}{new}"));
+                }
+                if here {
+                    self.apply_model_info();
+                }
+            }
+            Err(e) => {
+                let short: String = e.chars().take(120).collect();
+                let rejected = e.ends_with("rejected these credentials");
+                if rejected || choose || (reported && (here || !absent)) {
+                    self.error(&format!("{provider}: {short}"));
+                } else if here && self.current_models().is_empty() {
+                    self.notice(format!("could not list models: {short}"));
+                }
+            }
+        }
+        self.refresh_model_picker();
+        self.refresh_provider_picker();
+        if choose && !failed && self.prompt.is_free() {
+            self.open_model_picker_for(provider);
+        }
+        self.dirty = true;
     }
 
     pub fn efforts_for_model(&self) -> Vec<Effort> {
-        self.models
+        self.current_models()
             .iter()
             .find(|m| m.id == self.info.model)
             .map(|m| m.efforts.clone())

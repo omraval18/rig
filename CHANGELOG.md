@@ -4,6 +4,28 @@ All notable changes to rig are recorded here. The format follows [Keep a Changel
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-24
+
+### Added
+
+- `/model` lists the models of every connected provider, grouped, with recent ones first. Search matches several words across providers; ←/→ jump between providers, Ctrl+R refreshes, `/model -` goes back. Lists are kept in the profile's `models.json`.
+- `/refresh` (was `/refresh-models`, which still works) fetches every connected provider's list and names the new models.
+- `/provider` (`/connect`) lists connected, built-in and models.dev providers in one place, opens by itself when nothing is connected, and can refresh, re-key or disconnect a provider. A custom endpoint needs only its URL and key. New presets: `groq`, `mistral`, `cerebras`.
+- Ctrl+O switches profiles; typing a new name creates one, optionally with the current profile's keys and settings. Also `/profile remove`, `rig profile create --from`, `rig -p <name>`, and `rig profile` alone lists them.
+- `/login <provider>`, `/logout <provider>` and `rig login <provider>` handle API keys too.
+- `/help` is a searchable list that runs commands, and mistyped commands get a suggestion.
+
+### Changed
+
+- `rig models` lists models; the provider table it used to print is now `rig providers`.
+
+### Fixed
+
+- New ChatGPT models were hidden because rig asked for the list as an old Codex version.
+- Choosing an OpenRouter model such as `anthropic/…` switched to the Anthropic provider.
+- Choosing a provider you had added switched to an empty model name.
+- Switching profiles from `rigd` keeps it `rigd`.
+
 ## [0.4.0] - 2026-11-16
 
 ### Added

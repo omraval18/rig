@@ -13,31 +13,32 @@ pub fn profile(cmd: &ProfileCmd, flag: Option<&str>) -> i32 {
             let in_use = Paths::named_profile(flag).unwrap_or_else(|| profile::active(&base));
             for name in profile::list(&base) {
                 let mark = if name == in_use { "*" } else { " " };
-                println!(
-                    "{mark} {name:<16} {}",
-                    profile::describe(&base, &name)
-                );
+                println!("{mark} {name:<16} {}", profile::describe(&base, &name));
             }
             Ok(())
         }
-        ProfileCmd::Create { name, switch } => profile::create(&base, name).and_then(|dir| {
+        ProfileCmd::Create { name, from, switch } => match from {
+            Some(from) => profile::create_from(&base, name, from),
+            None => profile::create(&base, name),
+        }
+        .and_then(|dir| {
             println!("Created profile '{name}' in {}", dir.display());
             if *switch {
                 profile::set_active(&base, name)?;
                 println!("Now using '{name}'.");
             }
-            println!(
-                "Sign in with: rig --profile {name} login codex   or   rig --profile {name} key set <provider>"
-            );
+            println!("Open it with: rig -p {name}   (it starts by connecting a provider)");
             Ok(())
         }),
         ProfileCmd::Use { name } => profile::set_active(&base, name).map(|()| {
             println!("Now using profile '{name}'.");
         }),
         ProfileCmd::Remove { name, yes } => {
-            if !yes && !confirm(&format!(
-                "Delete profile '{name}' with its logins, keys, settings and sessions? [y/N] "
-            )) {
+            if !yes
+                && !confirm(&format!(
+                    "Delete profile '{name}' with its logins, keys, settings and sessions? [y/N] "
+                ))
+            {
                 println!("Kept '{name}'.");
                 return 0;
             }

@@ -119,9 +119,20 @@ pub struct Prompt {
     /// Images still being read or resized on worker threads.
     pub pending_images: usize,
     pub next_image: usize,
+    /// A custom endpoint (URL and key) whose API style is being asked for.
+    pub endpoint: Option<(String, String)>,
 }
 
 impl Prompt {
+    /// Nothing is typed or open, so a panel may take the keyboard.
+    pub fn is_free(&self) -> bool {
+        self.composer.is_empty()
+            && self.picker.is_none()
+            && self.entry.is_none()
+            && self.question.is_none()
+            && self.approval.is_none()
+    }
+
     pub fn new(history: Vec<String>) -> Self {
         Self {
             composer: Composer::new(history),
@@ -134,6 +145,7 @@ impl Prompt {
             attachments: Vec::new(),
             pending_images: 0,
             next_image: 1,
+            endpoint: None,
         }
     }
 }

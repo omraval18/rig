@@ -1,7 +1,7 @@
 //! Which provider and model to use, and whether there are credentials for them.
 
 use crate::config::default_model;
-use rig_core::provider::{Provider, ProviderError};
+use rig_core::provider::{ModelInfo, Provider, ProviderError};
 use rig_provider::{BuildEnv, ProviderSpec};
 
 use super::App;
@@ -87,10 +87,17 @@ impl App {
         if let Some(m) = self.cfg.model.as_deref() {
             return self.parse_model(m);
         }
-        for name in ["chatgpt", "anthropic", "openai", "xai", "openrouter"] {
-            let spec = self.provider_spec(name)?;
-            if self.has_credentials(&spec) {
-                return Ok((spec, default_model(name).unwrap_or_default().to_string()));
+        // The usual ones first, then whatever else is connected. A local server may not be running.
+        let preferred = ["chatgpt", "anthropic", "openai", "xai", "openrouter"];
+        let mut specs = self.cfg.providers();
+        specs.retain(|s| !s.keyless && self.has_credentials(s));
+        specs.sort_by_key(|s| {
+            let at = preferred.iter().position(|p| *p == s.name);
+            at.unwrap_or(preferred.len())
+        });
+        for spec in specs {
+            if let Some(model) = self.default_model_of(&spec) {
+                return Ok((spec, model));
             }
         }
         Err("no model is set up. Sign in with `rig login codex`, save a key with `rig key set <provider>`, or export ANTHROPIC_API_KEY / OPENAI_API_KEY / XAI_API_KEY / OPENROUTER_API_KEY".into())
@@ -158,6 +165,37 @@ impl App {
             spec.routes.insert(0, route?);
         }
         rig_provider::build(&spec, model, &env).map_err(|e| e.to_string())
+    }
+}
+
+/// Fetches a provider's model list. Runs on any thread.
+pub type ModelLister = Box<dyn FnOnce() -> Result<Vec<ModelInfo>, String> + Send>;
+
+impl App {
+    pub fn model_lister(&self, spec: &ProviderSpec) -> Result<ModelLister, String> {
+        let provider = self.build_provider(spec, "")?;
+        let base = self.paths.base.clone();
+        let spec = spec.clone();
+        Ok(Box::new(move || {
+            let from_catalog = || {
+                let id = spec.catalog_id.as_deref()?;
+                crate::catalog::models(&crate::catalog::ensure(&base).ok()?, id)
+            };
+            // A gateway's own list does not say which API each model needs; the catalog does.
+            if !spec.routes.is_empty()
+                && let Some(models) = from_catalog()
+            {
+                return Ok(models);
+            }
+            match provider.list_models() {
+                Ok(models) if !models.is_empty() => Ok(models),
+                Err(e) if e.is_rejected() => {
+                    Err(format!("{} rejected these credentials", spec.name))
+                }
+                // Some providers have no list of their own.
+                other => from_catalog().map_or_else(|| other.map_err(|e| e.to_string()), Ok),
+            }
+        }))
     }
 }
 

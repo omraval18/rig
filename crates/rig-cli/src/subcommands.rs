@@ -1,8 +1,8 @@
 //! Non-interactive subcommands.
 
 use crate::app::{App, Credential, RunOpts};
-use crate::config::default_model;
 use crate::desktop;
+use crate::models::Models;
 use crate::plain::PlainUi;
 use rig_core::message::{Block, Message, Role};
 use rig_provider::chatgpt;
@@ -89,7 +89,7 @@ pub fn ask(app: &App, opts: &RunOpts, words: &[String], as_json: bool) -> i32 {
     }
 }
 
-pub fn login(app: &App, provider: &str) -> i32 {
+pub fn login(app: App, provider: &str) -> i32 {
     match provider {
         "codex" | "chatgpt" => {
             let path = app.paths.chatgpt_auth_file();
@@ -122,12 +122,12 @@ pub fn login(app: &App, provider: &str) -> i32 {
                 }
             }
         }
-        other => {
-            eprintln!(
-                "error: '{other}' signs in with an API key, not a login. Save one with `rig key set {other}`, or export it (see `rig models`)."
-            );
-            1
-        }
+        other => key(
+            app,
+            &crate::KeyCmd::Set {
+                provider: other.into(),
+            },
+        ),
     }
 }
 
@@ -153,7 +153,54 @@ pub fn logout(app: &App) -> i32 {
     }
 }
 
-pub fn models(app: &App) -> i32 {
+/// Every connected provider's models, one `provider/model` per line, ready for `rig -m`.
+pub fn models(app: &App, query: &[String], refresh: bool) -> i32 {
+    let mut known = Models::load(&app.paths.models_file());
+    let mut specs = app.cfg.providers();
+    specs.retain(|s| app.has_credentials(s));
+    let mut fetches = Vec::new();
+    for spec in &specs {
+        if !refresh && !known.is_stale(spec) {
+            continue;
+        }
+        match app.model_lister(spec) {
+            Ok(lister) => {
+                let seq = known.begin(spec);
+                fetches.push((spec, seq, std::thread::spawn(lister)));
+            }
+            Err(e) => eprintln!("{}: {e}", spec.name),
+        }
+    }
+    for (spec, seq, thread) in fetches {
+        let result = thread.join().unwrap_or_else(|_| Err("failed".into()));
+        // A local server that is not running is not worth a warning.
+        if let Some(Err(e)) = known.finish(&spec.name, seq, result)
+            && !spec.keyless
+        {
+            eprintln!("{}: {e}", spec.name);
+        }
+    }
+    let words: Vec<String> = query.iter().map(|w| w.to_lowercase()).collect();
+    let mut shown = 0;
+    for spec in &specs {
+        for m in known.of(spec).iter().filter(|m| !m.hidden) {
+            let id = format!("{}/{}", spec.name, m.id);
+            let detail = crate::slash::model::model_detail(spec, m);
+            let hay = format!("{id} {detail}").to_lowercase();
+            if words.iter().all(|w| hay.contains(w)) {
+                println!("{}", format!("{id:<44} {detail}").trim_end());
+                shown += 1;
+            }
+        }
+    }
+    if shown == 0 {
+        eprintln!("no models found; `rig providers` shows what is connected");
+        return 1;
+    }
+    0
+}
+
+pub fn providers(app: &App) -> i32 {
     println!("Profile '{}'\n", app.paths.profile);
     println!(
         "{:<12} {:<10} {:<28} AUTH",
@@ -177,7 +224,7 @@ pub fn models(app: &App) -> i32 {
             "{:<12} {:<10} {:<28} {}",
             s.name,
             format!("{:?}", s.kind).to_lowercase(),
-            default_model(&s.name).unwrap_or("-"),
+            app.default_model_of(&s).unwrap_or_else(|| "-".into()),
             auth
         );
     }

@@ -17,7 +17,20 @@ pub fn load(path: &Path) -> BTreeMap<String, ProviderSpec> {
 pub fn save(path: &Path, spec: &ProviderSpec) -> Result<(), String> {
     let mut all = load(path);
     all.insert(spec.name.clone(), spec.clone());
-    let text = serde_json::to_string_pretty(&all).map_err(|e| e.to_string())?;
+    write(path, &all)
+}
+
+/// Forgets a provider; `false` when the file has none by that name.
+pub fn remove(path: &Path, name: &str) -> Result<bool, String> {
+    let mut all = load(path);
+    if all.remove(name).is_none() {
+        return Ok(false);
+    }
+    write(path, &all).map(|()| true)
+}
+
+fn write(path: &Path, all: &BTreeMap<String, ProviderSpec>) -> Result<(), String> {
+    let text = serde_json::to_string_pretty(all).map_err(|e| e.to_string())?;
     rig_core::fsutil::write_atomic(path, text.as_bytes(), 0o600)
         .map(drop)
         .map_err(|e| format!("cannot write {}: {e}", path.display()))
@@ -53,6 +66,7 @@ mod tests {
             Some(Some("big-model".into()))
         );
         assert_eq!(back["mine"].kind, Kind::Chat);
+        assert!(remove(&path, "mine").unwrap() && !remove(&path, "mine").unwrap());
         std::fs::remove_dir_all(dir).ok();
     }
 }

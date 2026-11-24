@@ -15,6 +15,9 @@ pub struct State {
     /// `provider/model` of the last model you switched to.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    /// `provider/model` of models switched to, newest first, for the top of the model picker.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recent_models: Vec<String>,
     /// `low`..`xhigh`, or `none`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>,
@@ -37,6 +40,7 @@ impl Default for State {
     fn default() -> Self {
         State {
             model: None,
+            recent_models: Vec::new(),
             effort: None,
             autonomy: None,
             show_reasoning: None,
@@ -48,6 +52,16 @@ impl Default for State {
 }
 
 impl State {
+    /// Most models kept in `recent_models`.
+    const RECENT: usize = 5;
+
+    /// Put `model` at the front of the recent list.
+    pub fn touch_model(&mut self, model: &str) {
+        self.recent_models.retain(|m| m != model);
+        self.recent_models.insert(0, model.to_string());
+        self.recent_models.truncate(Self::RECENT);
+    }
+
     pub fn mouse_enabled(&self) -> bool {
         self.mouse.unwrap_or(true)
     }

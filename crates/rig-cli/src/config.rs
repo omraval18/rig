@@ -140,6 +140,11 @@ impl Paths {
         self.root.join("providers.json")
     }
 
+    /// Model lists from the providers, as last fetched.
+    pub fn models_file(&self) -> PathBuf {
+        self.root.join("models.json")
+    }
+
     pub fn history_file(&self) -> PathBuf {
         self.root.join("history")
     }

@@ -2,11 +2,9 @@
 
 use super::format::tool_label;
 use super::{Part, PendingApproval, RunTool, Tui};
-use crate::picker::PickKind;
 use crate::runtime::Ev;
 use crate::view::{self, ApprovalView};
 use rig_core::permission::Approval;
-use rig_core::provider::ModelInfo;
 use std::sync::mpsc::Sender;
 use std::time::Instant;
 
@@ -51,7 +49,13 @@ impl Tui {
                 options,
                 reply,
             } => self.open_question(question, options, reply),
-            Ev::Models { provider, models } => self.on_models(&provider, models),
+            Ev::Models {
+                provider,
+                seq,
+                models,
+            } => self.on_models(&provider, seq, models),
+            Ev::Catalog => self.refresh_provider_picker(),
+            Ev::Probed { url, key, result } => self.endpoint_probed(&url, &key, result),
             Ev::Notice(text) => self.say(&text),
             Ev::ImageReady(result) => {
                 self.prompt.pending_images = self.prompt.pending_images.saturating_sub(1);
@@ -63,7 +67,7 @@ impl Tui {
             Ev::RolledBack => self.turn.rolled_back = true,
             Ev::LoginDone(Ok(message)) => {
                 self.say(&message);
-                self.reauth();
+                self.connected("chatgpt");
             }
             Ev::LoginDone(Err(e)) => self.error(&e),
         }
@@ -135,34 +139,6 @@ impl Tui {
         });
         self.prompt.completion = None;
         self.dirty = true;
-    }
-
-    fn on_models(&mut self, provider: &str, models: Result<Vec<ModelInfo>, String>) {
-        if provider != self.info.spec.name {
-            return;
-        }
-        match models {
-            Ok(models) => {
-                self.models = models;
-                self.apply_model_info();
-                let showing_models = self
-                    .prompt
-                    .picker
-                    .as_ref()
-                    .is_some_and(|p| p.kind == PickKind::Model);
-                if showing_models {
-                    let items = self.model_items();
-                    if let Some(picker) = self.prompt.picker.as_mut() {
-                        picker.replace_items(items);
-                    }
-                }
-            }
-            Err(e) if self.models.is_empty() => {
-                let short: String = e.chars().take(80).collect();
-                self.notice(format!("could not list models: {short}"));
-            }
-            Err(_) => {}
-        }
     }
 }
 
